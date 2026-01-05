@@ -39,7 +39,7 @@ const SYSTEM_PROMPT = `你是一位精通紫微斗数的命理师，名为"星�
 
 export function AIInterpretation() {
   const { chart, birthInfo } = useChartStore()
-  const { provider, providerSettings, enableThinking } = useSettingsStore()
+  const { provider, providerSettings, enableThinking, enableWebSearch, searchApiKey } = useSettingsStore()
   const currentSettings = providerSettings[provider]
 
   const [interpretation, setInterpretation] = useState('')
@@ -85,6 +85,8 @@ ${contextStr}
         baseUrl: currentSettings.customBaseUrl || undefined,
         model: currentSettings.customModel || undefined,
         enableThinking,
+        enableWebSearch,
+        searchApiKey: searchApiKey || undefined,
       }
 
       // 流式输出
@@ -98,7 +100,7 @@ ${contextStr}
     } finally {
       setLoading(false)
     }
-  }, [chart, birthInfo, provider, currentSettings, enableThinking])
+  }, [chart, birthInfo, provider, currentSettings, enableThinking, enableWebSearch, searchApiKey])
 
   if (!chart) return null
 

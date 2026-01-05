@@ -46,7 +46,7 @@ const FORTUNE_PROMPT = `你是一位精通紫微斗数的命理师。现在需�
 
 export function YearlyFortune() {
   const { chart, birthInfo } = useChartStore()
-  const { provider, providerSettings, enableThinking } = useSettingsStore()
+  const { provider, providerSettings, enableThinking, enableWebSearch, searchApiKey } = useSettingsStore()
   const currentSettings = providerSettings[provider]
 
   const [year, setYear] = useState(currentYear)
@@ -102,6 +102,8 @@ ${yearlyInfo}
         baseUrl: currentSettings.customBaseUrl || undefined,
         model: currentSettings.customModel || undefined,
         enableThinking,
+        enableWebSearch,
+        searchApiKey: searchApiKey || undefined,
       }
 
       let fullText = ''
@@ -114,7 +116,7 @@ ${yearlyInfo}
     } finally {
       setLoading(false)
     }
-  }, [chart, birthInfo, year, provider, currentSettings, enableThinking])
+  }, [chart, birthInfo, year, provider, currentSettings, enableThinking, enableWebSearch, searchApiKey])
 
   if (!chart) return null
 

@@ -147,7 +147,7 @@ function PersonInput({ label, value, onChange }: PersonInputProps) {
    ------------------------------------------------------------ */
 
 export function MatchAnalysis() {
-  const { provider, providerSettings, enableThinking } = useSettingsStore()
+  const { provider, providerSettings, enableThinking, enableWebSearch, searchApiKey } = useSettingsStore()
   const currentSettings = providerSettings[provider]
 
   const [person1, setPerson1] = useState<BirthInfo>({
@@ -210,6 +210,8 @@ ${context2}
         baseUrl: currentSettings.customBaseUrl || undefined,
         model: currentSettings.customModel || undefined,
         enableThinking,
+        enableWebSearch,
+        searchApiKey: searchApiKey || undefined,
       }
 
       let fullText = ''
@@ -222,7 +224,7 @@ ${context2}
     } finally {
       setLoading(false)
     }
-  }, [person1, person2, provider, currentSettings, enableThinking])
+  }, [person1, person2, provider, currentSettings, enableThinking, enableWebSearch, searchApiKey])
 
   return (
     <div className="w-full max-w-4xl mx-auto space-y-4">

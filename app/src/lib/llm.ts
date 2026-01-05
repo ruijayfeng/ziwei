@@ -11,6 +11,8 @@ export interface LLMConfig {
   baseUrl?: string
   model?: string
   enableThinking?: boolean
+  enableWebSearch?: boolean
+  searchApiKey?: string  // Tavily API Key
 }
 
 export interface ChatMessage {
@@ -52,6 +54,59 @@ export const PROVIDER_CONFIGS: Record<ModelProvider, { baseUrl: string; defaultM
 }
 
 /* ------------------------------------------------------------
+   Tavily 搜索 (用于无原生搜索的模型)
+   ------------------------------------------------------------ */
+
+interface TavilyResult {
+  title: string
+  url: string
+  content: string
+}
+
+async function searchWithTavily(query: string, apiKey: string): Promise<string> {
+  try {
+    const response = await fetch('https://api.tavily.com/search', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        api_key: apiKey,
+        query,
+        search_depth: 'basic',
+        max_results: 5,
+      }),
+    })
+
+    if (!response.ok) {
+      console.warn('Tavily search failed:', response.status)
+      return ''
+    }
+
+    const data = await response.json()
+    const results = data.results as TavilyResult[] || []
+
+    if (results.length === 0) return ''
+
+    // 格式化搜索结果
+    const formatted = results.map((r, i) =>
+      `[${i + 1}] ${r.title}\n${r.content}\n来源: ${r.url}`
+    ).join('\n\n')
+
+    return `\n\n---\n【联网搜索结果】\n${formatted}\n---\n\n`
+  } catch (err) {
+    console.warn('Tavily search error:', err)
+    return ''
+  }
+}
+
+// 从消息中提取搜索关键词
+function extractSearchQuery(messages: ChatMessage[]): string {
+  const lastUserMessage = messages.filter(m => m.role === 'user').pop()
+  return lastUserMessage?.content || ''
+}
+
+/* ------------------------------------------------------------
    OpenAI 兼容格式请求 (Kimi, DeepSeek, Custom)
    ------------------------------------------------------------ */
 
@@ -59,7 +114,7 @@ async function* streamOpenAICompatible(
   config: LLMConfig,
   messages: ChatMessage[]
 ): AsyncGenerator<string> {
-  const { provider, apiKey, baseUrl, model, enableThinking } = config
+  const { provider, apiKey, baseUrl, model, enableThinking, enableWebSearch, searchApiKey } = config
   const providerConfig = PROVIDER_CONFIGS[provider]
 
   // 确定使用的模型（思考模式切换专用模型）
@@ -74,17 +129,45 @@ async function* streamOpenAICompatible(
 
   const url = `${baseUrl || providerConfig.baseUrl}/chat/completions`
 
+  // 构建请求体
+  const requestBody: Record<string, unknown> = {
+    model: useModel,
+    messages,
+    stream: true,
+  }
+
+  // Kimi 原生搜索
+  if (enableWebSearch && provider === 'kimi') {
+    requestBody.tools = [{
+      type: 'builtin_function',
+      function: { name: '$web_search' },
+    }]
+  }
+
+  // 非 Kimi 且有 Tavily API，先搜索再注入结果
+  let processedMessages = messages
+  if (enableWebSearch && provider !== 'kimi' && searchApiKey) {
+    const query = extractSearchQuery(messages)
+    if (query) {
+      const searchResult = await searchWithTavily(query, searchApiKey)
+      if (searchResult) {
+        processedMessages = messages.map((m, i) =>
+          i === 0 && m.role === 'system'
+            ? { ...m, content: m.content + searchResult }
+            : m
+        )
+      }
+    }
+    requestBody.messages = processedMessages
+  }
+
   const response = await fetch(url, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${apiKey}`,
     },
-    body: JSON.stringify({
-      model: useModel,
-      messages,
-      stream: true,
-    }),
+    body: JSON.stringify(requestBody),
   })
 
   if (!response.ok) {
@@ -129,7 +212,7 @@ async function* streamGemini(
   config: LLMConfig,
   messages: ChatMessage[]
 ): AsyncGenerator<string> {
-  const { apiKey, model, baseUrl, enableThinking } = config
+  const { apiKey, model, baseUrl, enableThinking, enableWebSearch } = config
   const providerConfig = PROVIDER_CONFIGS.gemini
 
   // 思考模式切换到 gemini-3-pro-preview
@@ -151,13 +234,21 @@ async function* streamGemini(
 
   const url = `${baseUrl || providerConfig.baseUrl}/models/${modelName}:streamGenerateContent?key=${apiKey}`
 
+  // 构建请求体
+  const requestBody: Record<string, unknown> = {
+    contents,
+    systemInstruction: systemMessage ? { parts: [{ text: systemMessage.content }] } : undefined,
+  }
+
+  // Gemini 原生 Google 搜索
+  if (enableWebSearch) {
+    requestBody.tools = [{ google_search: {} }]
+  }
+
   const response = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      contents,
-      systemInstruction: systemMessage ? { parts: [{ text: systemMessage.content }] } : undefined,
-    }),
+    body: JSON.stringify(requestBody),
   })
 
   if (!response.ok) {
@@ -202,12 +293,23 @@ async function* streamClaude(
   config: LLMConfig,
   messages: ChatMessage[]
 ): AsyncGenerator<string> {
-  const { apiKey, model, baseUrl, enableThinking } = config
+  const { apiKey, model, baseUrl, enableThinking, enableWebSearch, searchApiKey } = config
   const providerConfig = PROVIDER_CONFIGS.claude
 
   // 提取系统消息
-  const systemMessage = messages.find(m => m.role === 'system')?.content || ''
+  let systemMessage = messages.find(m => m.role === 'system')?.content || ''
   const chatMessages = messages.filter(m => m.role !== 'system')
+
+  // 如果启用搜索且有 Tavily API，先搜索再注入结果
+  if (enableWebSearch && searchApiKey) {
+    const query = extractSearchQuery(messages)
+    if (query) {
+      const searchResult = await searchWithTavily(query, searchApiKey)
+      if (searchResult) {
+        systemMessage += searchResult
+      }
+    }
+  }
 
   // 构建请求体
   const requestBody: Record<string, unknown> = {

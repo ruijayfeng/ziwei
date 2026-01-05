@@ -42,9 +42,13 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
     provider,
     providerSettings,
     enableThinking,
+    enableWebSearch,
+    searchApiKey,
     setProvider,
     updateCurrentProvider,
     setEnableThinking,
+    setEnableWebSearch,
+    setSearchApiKey,
   } = useSettingsStore()
 
   // 当前厂商的配置
@@ -53,6 +57,7 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
   const [localApiKey, setLocalApiKey] = useState(currentSettings.apiKey)
   const [localBaseUrl, setLocalBaseUrl] = useState(currentSettings.customBaseUrl)
   const [localModel, setLocalModel] = useState(currentSettings.customModel)
+  const [localSearchApiKey, setLocalSearchApiKey] = useState(searchApiKey)
   const [showAdvanced, setShowAdvanced] = useState(false)
   const [saved, setSaved] = useState(false)
   const [pendingProvider, setPendingProvider] = useState<ModelProvider | null>(null)
@@ -61,7 +66,8 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
   const hasUnsavedChanges =
     localApiKey !== currentSettings.apiKey ||
     localBaseUrl !== currentSettings.customBaseUrl ||
-    localModel !== currentSettings.customModel
+    localModel !== currentSettings.customModel ||
+    localSearchApiKey !== searchApiKey
 
   // 切换厂商时，检查是否有未保存修改
   const handleProviderChange = (newProvider: ModelProvider) => {
@@ -91,6 +97,7 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
       customBaseUrl: localBaseUrl,
       customModel: localModel,
     })
+    setSearchApiKey(localSearchApiKey)
     if (pendingProvider) {
       switchToProvider(pendingProvider)
     }
@@ -113,6 +120,7 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
       customBaseUrl: localBaseUrl,
       customModel: localModel,
     })
+    setSearchApiKey(localSearchApiKey)
     setSaved(true)
     setTimeout(() => setSaved(false), 2000)
   }
@@ -290,6 +298,71 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
                   </p>
                 </div>
               </label>
+
+              {/* 联网搜索开关 */}
+              <label className="flex items-center gap-3 cursor-pointer group">
+                <div
+                  className={`
+                    w-10 h-6 rounded-full relative transition-colors
+                    ${enableWebSearch ? 'bg-star' : 'bg-white/10'}
+                  `}
+                  onClick={() => setEnableWebSearch(!enableWebSearch)}
+                >
+                  <div
+                    className={`
+                      absolute top-1 w-4 h-4 rounded-full bg-white transition-transform
+                      ${enableWebSearch ? 'left-5' : 'left-1'}
+                    `}
+                  />
+                </div>
+                <div>
+                  <span className="text-sm text-text-secondary group-hover:text-text transition-colors">
+                    启用联网搜索
+                  </span>
+                  <p className="text-xs text-text-muted">
+                    {provider === 'kimi' || provider === 'gemini'
+                      ? '使用原生搜索能力'
+                      : '需配置 Tavily API'}
+                  </p>
+                </div>
+              </label>
+
+              {/* Tavily API Key (非 Kimi/Gemini 显示) */}
+              {enableWebSearch && provider !== 'kimi' && provider !== 'gemini' && (
+                <div>
+                  <label className="block text-sm text-text-secondary mb-1.5">
+                    Tavily API Key
+                    {localSearchApiKey.trim() && <span className="text-amber ml-2 text-xs">已配置</span>}
+                  </label>
+                  <input
+                    type="password"
+                    placeholder="输入 Tavily API Key"
+                    value={localSearchApiKey}
+                    onChange={(e) => setLocalSearchApiKey(e.target.value)}
+                    className={`
+                      w-full px-3 py-2 rounded-lg text-sm
+                      bg-white/5 border transition-colors
+                      placeholder:text-text-muted/50
+                      focus:outline-none focus:ring-1
+                      ${localSearchApiKey.trim()
+                        ? 'border-amber/50 focus:border-amber focus:ring-amber/30 text-text'
+                        : 'border-white/10 focus:border-star focus:ring-star/30 text-text-secondary'
+                      }
+                    `}
+                  />
+                  <p className="text-xs text-text-muted mt-1">
+                    获取 API Key:{' '}
+                    <a
+                      href="https://tavily.com"
+                      target="_blank"
+                      rel="noopener"
+                      className="text-star hover:underline"
+                    >
+                      tavily.com
+                    </a>
+                  </p>
+                </div>
+              )}
             </div>
           )}
         </div>

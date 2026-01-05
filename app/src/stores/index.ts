@@ -49,10 +49,14 @@ interface SettingsState {
   provider: ModelProvider
   providerSettings: Record<ModelProvider, ProviderSettings>
   enableThinking: boolean
+  enableWebSearch: boolean   // 启用联网搜索
+  searchApiKey: string       // 第三方搜索 API (Tavily)
 
   setProvider: (provider: ModelProvider) => void
   updateCurrentProvider: (settings: Partial<ProviderSettings>) => void
   setEnableThinking: (enable: boolean) => void
+  setEnableWebSearch: (enable: boolean) => void
+  setSearchApiKey: (key: string) => void
 
   // 便捷访问当前厂商配置
   getCurrentSettings: () => ProviderSettings
@@ -70,6 +74,8 @@ export const useSettingsStore = create<SettingsState>()(
         custom: { ...DEFAULT_PROVIDER_SETTINGS },
       },
       enableThinking: false,
+      enableWebSearch: false,
+      searchApiKey: '',
 
       setProvider: (provider) => set({ provider }),
 
@@ -84,6 +90,8 @@ export const useSettingsStore = create<SettingsState>()(
       })),
 
       setEnableThinking: (enable) => set({ enableThinking: enable }),
+      setEnableWebSearch: (enable) => set({ enableWebSearch: enable }),
+      setSearchApiKey: (key) => set({ searchApiKey: key }),
 
       getCurrentSettings: () => {
         const state = get()

@@ -5,11 +5,25 @@
 ## 当前状态
 
 ```
-[迭代优化完成] 2026-01-05
-品牌升级 + 设置面板重构 + 多模型思考模式
+[联网搜索功能完成] 2026-01-05
+多模型联网搜索：Kimi/Gemini 原生搜索 + Tavily 第三方 API
 ```
 
 ## 变更日志
+
+### 2026-01-05 联网搜索功能
+**新增功能**
+- 联网搜索开关：在高级设置中开启
+- Kimi：使用原生 `$web_search` 工具
+- Gemini：使用原生 `google_search` 工具
+- Claude/DeepSeek/Custom：支持 Tavily 第三方搜索 API
+- 搜索结果注入：自动将搜索结果添加到系统提示词
+
+**实现细节**
+- stores/index.ts: 新增 `enableWebSearch` 和 `searchApiKey` 状态
+- lib/llm.ts: 添加 `searchWithTavily()` 函数和各模型搜索逻辑
+- SettingsPanel.tsx: 联网搜索开关 + Tavily API Key 输入框
+- AIInterpretation/YearlyFortune/MatchAnalysis: 传递搜索配置
 
 ### 2026-01-05 迭代优化
 **品牌升级**
