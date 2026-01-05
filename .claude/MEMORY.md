@@ -8,7 +8,8 @@
 [完成] P1: 核心排盘 + 基础UI
 [完成] P2: AI 解读 + 知识库
 [完成] P3: 年度运势 + 双人合盘
-[待做] P4: 分享卡片 + 打磨
+[完成] P4: 分享卡片 + 打磨
+[MVP 完成]
 ```
 
 ## 开发进度
@@ -18,7 +19,7 @@
 | P1 | ✅ | `863b7cb` |
 | P2 | ✅ | `7855b2a` |
 | P3 | ✅ | `0de45af` |
-| P4 | ⏳ | - |
+| P4 | ✅ | `9eea111` |
 
 ## 架构地图
 
@@ -35,6 +36,7 @@ zwds/
 │   │   │   ├── chart/        # 命盘组件 (ChartDisplay)
 │   │   │   ├── fortune/      # 年度运势 (YearlyFortune)
 │   │   │   ├── match/        # 双人合盘 (MatchAnalysis)
+│   │   │   ├── share/        # 分享卡片 (ShareCard)
 │   │   │   ├── BirthForm.tsx # 生辰输入
 │   │   │   ├── AIInterpretation.tsx # AI 解读
 │   │   │   └── SettingsPanel.tsx    # 设置面板
@@ -69,5 +71,6 @@ zwds/
 | `components/chart/` | 命盘可视化（十二宫布局） |
 | `components/fortune/` | 年度运势分析 |
 | `components/match/` | 双人合盘分析 |
+| `components/share/` | 分享卡片导出 |
 | `components/AIInterpretation` | AI 解读面板 |
 | `stores/` | 全局状态（命盘、设置） |
