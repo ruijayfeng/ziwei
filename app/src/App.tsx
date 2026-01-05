@@ -35,7 +35,7 @@ export default function App() {
         <div className="max-w-4xl mx-auto flex items-center justify-between">
           <div className="text-center flex-1">
             <h1 className="text-3xl font-bold bg-gradient-to-r from-star-light to-amber bg-clip-text text-transparent">
-              Ziwei
+              紫微知道
             </h1>
             <p className="text-text-secondary mt-2">
               基于紫微斗数的 AI 命理工具
@@ -128,7 +128,7 @@ export default function App() {
 
       {/* 底部 */}
       <footer className="py-6 text-center text-text-muted text-sm">
-        <p>Ziwei · 开源命理工具</p>
+        <p>紫微知道 · 开源命理工具</p>
       </footer>
     </div>
   )
