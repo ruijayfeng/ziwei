@@ -93,17 +93,146 @@ async function searchWithTavily(query: string, apiKey: string): Promise<string> 
       `[${i + 1}] ${r.title}\n${r.content}\n来源: ${r.url}`
     ).join('\n\n')
 
-    return `\n\n---\n【联网搜索结果】\n${formatted}\n---\n\n`
+    return formatted
   } catch (err) {
     console.warn('Tavily search error:', err)
     return ''
   }
 }
 
-// 从消息中提取搜索关键词
-function extractSearchQuery(messages: ChatMessage[]): string {
-  const lastUserMessage = messages.filter(m => m.role === 'user').pop()
-  return lastUserMessage?.content || ''
+/* ------------------------------------------------------------
+   智能搜索关键词提取 (用 LLM 提取精准搜索词)
+   ------------------------------------------------------------ */
+
+const KEYWORD_EXTRACTION_PROMPT = `你是紫微斗数搜索助手。从命盘信息中提取最有价值的搜索关键词，用于联网搜索增强解读准确性。
+
+## 要求：
+1. 提取 2-3 个最关键的搜索查询
+2. 每个查询应该是独立的、有针对性的紫微斗数术语组合
+3. 优先关注：命宫主星组合、重要四化、特殊格局
+4. 格式：每行一个查询，不要编号，不要其他说明
+
+## 示例输出：
+紫微斗数 天机太阴 命宫 性格事业
+紫微斗数 武曲化忌 财帛宫 影响化解
+紫微斗数 机月同梁格 特点`
+
+async function extractSearchKeywords(
+  config: LLMConfig,
+  chartContext: string
+): Promise<string[]> {
+  const { provider, apiKey, baseUrl, model } = config
+  const providerConfig = PROVIDER_CONFIGS[provider]
+
+  try {
+    // 使用非流式请求提取关键词
+    if (provider === 'gemini') {
+      // Gemini 非流式
+      const url = `${baseUrl || providerConfig.baseUrl}/models/${model || providerConfig.defaultModel}:generateContent?key=${apiKey}`
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ role: 'user', parts: [{ text: chartContext }] }],
+          systemInstruction: { parts: [{ text: KEYWORD_EXTRACTION_PROMPT }] },
+        }),
+      })
+
+      if (!response.ok) return []
+      const data = await response.json()
+      const text = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
+      return text.split('\n').map((s: string) => s.trim()).filter((s: string) => s.length > 0)
+
+    } else if (provider === 'claude') {
+      // Claude 非流式
+      const response = await fetch(`${baseUrl || providerConfig.baseUrl}/messages`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01',
+        },
+        body: JSON.stringify({
+          model: model || providerConfig.defaultModel,
+          max_tokens: 200,
+          system: KEYWORD_EXTRACTION_PROMPT,
+          messages: [{ role: 'user', content: chartContext }],
+        }),
+      })
+
+      if (!response.ok) return []
+      const data = await response.json()
+      const text = data.content?.[0]?.text || ''
+      return text.split('\n').map((s: string) => s.trim()).filter((s: string) => s.length > 0)
+
+    } else {
+      // OpenAI 兼容 (Kimi, DeepSeek, Custom)
+      const url = `${baseUrl || providerConfig.baseUrl}/chat/completions`
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model: model || providerConfig.defaultModel,
+          messages: [
+            { role: 'system', content: KEYWORD_EXTRACTION_PROMPT },
+            { role: 'user', content: chartContext },
+          ],
+          max_tokens: 200,
+        }),
+      })
+
+      if (!response.ok) return []
+      const data = await response.json()
+      const text = data.choices?.[0]?.message?.content || ''
+      return text.split('\n').map((s: string) => s.trim()).filter((s: string) => s.length > 0)
+    }
+  } catch (err) {
+    console.warn('Keyword extraction failed:', err)
+    return []
+  }
+}
+
+/* ------------------------------------------------------------
+   智能联网搜索 (先提取关键词，再搜索)
+   ------------------------------------------------------------ */
+
+async function performSmartSearch(
+  config: LLMConfig,
+  messages: ChatMessage[]
+): Promise<string> {
+  const { searchApiKey } = config
+
+  if (!searchApiKey) return ''
+
+  // 从 messages 中提取命盘上下文
+  const userMessage = messages.find(m => m.role === 'user')?.content || ''
+
+  // 用 LLM 提取搜索关键词
+  const keywords = await extractSearchKeywords(config, userMessage)
+
+  if (keywords.length === 0) {
+    console.warn('No keywords extracted, skipping search')
+    return ''
+  }
+
+  console.log('Search keywords:', keywords)
+
+  // 对每个关键词进行搜索
+  const allResults: string[] = []
+
+  for (const keyword of keywords.slice(0, 3)) {
+    const result = await searchWithTavily(keyword, searchApiKey)
+    if (result) {
+      allResults.push(`【${keyword}】\n${result}`)
+    }
+  }
+
+  if (allResults.length === 0) return ''
+
+  return `\n\n---\n【联网搜索参考资料】\n以下是针对命盘关键要素的搜索结果，请结合这些资料进行更准确的解读：\n\n${allResults.join('\n\n')}\n---\n\n`
 }
 
 /* ------------------------------------------------------------
@@ -144,19 +273,16 @@ async function* streamOpenAICompatible(
     }]
   }
 
-  // 非 Kimi 且有 Tavily API，先搜索再注入结果
+  // 非 Kimi 且有 Tavily API，使用智能搜索
   let processedMessages = messages
   if (enableWebSearch && provider !== 'kimi' && searchApiKey) {
-    const query = extractSearchQuery(messages)
-    if (query) {
-      const searchResult = await searchWithTavily(query, searchApiKey)
-      if (searchResult) {
-        processedMessages = messages.map((m, i) =>
-          i === 0 && m.role === 'system'
-            ? { ...m, content: m.content + searchResult }
-            : m
-        )
-      }
+    const searchResult = await performSmartSearch(config, messages)
+    if (searchResult) {
+      processedMessages = messages.map((m, i) =>
+        i === 0 && m.role === 'system'
+          ? { ...m, content: m.content + searchResult }
+          : m
+      )
     }
     requestBody.messages = processedMessages
   }
@@ -300,14 +426,11 @@ async function* streamClaude(
   let systemMessage = messages.find(m => m.role === 'system')?.content || ''
   const chatMessages = messages.filter(m => m.role !== 'system')
 
-  // 如果启用搜索且有 Tavily API，先搜索再注入结果
+  // 如果启用搜索且有 Tavily API，使用智能搜索
   if (enableWebSearch && searchApiKey) {
-    const query = extractSearchQuery(messages)
-    if (query) {
-      const searchResult = await searchWithTavily(query, searchApiKey)
-      if (searchResult) {
-        systemMessage += searchResult
-      }
+    const searchResult = await performSmartSearch(config, messages)
+    if (searchResult) {
+      systemMessage += searchResult
     }
   }
 
