@@ -1,0 +1,1 @@
+export { YearlyFortune } from './YearlyFortune'

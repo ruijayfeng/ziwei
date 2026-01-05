@@ -7,11 +7,22 @@ import { BirthForm } from '@/components/BirthForm'
 import { ChartDisplay } from '@/components/chart'
 import { AIInterpretation } from '@/components/AIInterpretation'
 import { SettingsPanel } from '@/components/SettingsPanel'
+import { YearlyFortune } from '@/components/fortune'
+import { MatchAnalysis } from '@/components/match'
 import { useChartStore } from '@/stores'
+
+type TabType = 'chart' | 'fortune' | 'match'
+
+const TABS: Array<{ key: TabType; label: string; needsChart: boolean }> = [
+  { key: 'chart', label: '命盘解读', needsChart: true },
+  { key: 'fortune', label: '年度运势', needsChart: true },
+  { key: 'match', label: '双人合盘', needsChart: false },
+]
 
 export default function App() {
   const { chart } = useChartStore()
   const [showSettings, setShowSettings] = useState(false)
+  const [activeTab, setActiveTab] = useState<TabType>('chart')
 
   return (
     <div className="min-h-screen">
@@ -42,28 +53,68 @@ export default function App() {
         </div>
       </header>
 
+      {/* 标签栏 */}
+      <nav className="px-4 mb-6">
+        <div className="max-w-4xl mx-auto flex gap-2 justify-center">
+          {TABS.map((tab) => (
+            <button
+              key={tab.key}
+              onClick={() => setActiveTab(tab.key)}
+              className={`
+                px-4 py-2 rounded-lg text-sm font-medium transition-all
+                ${activeTab === tab.key
+                  ? 'bg-star text-white'
+                  : 'text-text-muted hover:text-text hover:bg-white/5'
+                }
+              `}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      </nav>
+
       {/* 主内容 */}
       <main className="px-4 pb-12">
-        {!chart ? (
-          /* 未排盘：显示输入表单 */
-          <BirthForm />
-        ) : (
-          /* 已排盘：显示命盘 + AI 解读 */
-          <div className="space-y-6">
-            <ChartDisplay />
-            <AIInterpretation />
+        {/* 命盘解读标签 */}
+        {activeTab === 'chart' && (
+          !chart ? (
+            <BirthForm />
+          ) : (
+            <div className="space-y-6">
+              <ChartDisplay />
+              <AIInterpretation />
+              <div className="text-center">
+                <button
+                  onClick={() => useChartStore.getState().clear()}
+                  className="text-sm text-text-muted hover:text-text-secondary transition-colors"
+                >
+                  ← 重新输入
+                </button>
+              </div>
+            </div>
+          )
+        )}
 
-            {/* 重新排盘按钮 */}
+        {/* 年度运势标签 */}
+        {activeTab === 'fortune' && (
+          !chart ? (
             <div className="text-center">
+              <p className="text-text-muted mb-4">请先在「命盘解读」中输入您的生辰信息</p>
               <button
-                onClick={() => useChartStore.getState().clear()}
-                className="text-sm text-text-muted hover:text-text-secondary transition-colors"
+                onClick={() => setActiveTab('chart')}
+                className="text-star hover:text-star-light transition-colors"
               >
-                ← 重新输入
+                前往输入 →
               </button>
             </div>
-          </div>
+          ) : (
+            <YearlyFortune />
+          )
         )}
+
+        {/* 双人合盘标签 */}
+        {activeTab === 'match' && <MatchAnalysis />}
       </main>
 
       {/* 设置弹窗 */}
