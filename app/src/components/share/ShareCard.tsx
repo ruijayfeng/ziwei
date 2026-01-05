@@ -63,14 +63,17 @@ export function ShareCard() {
   const palaces = chart.palaces
 
   return (
-    <div className="space-y-4">
+    <div className="glass p-6">
+      <h3 className="text-lg font-semibold text-amber mb-4">分享卡片</h3>
+
       {/* 预览卡片 */}
       <div
         ref={cardRef}
-        className="p-6 rounded-2xl"
+        className="p-6 rounded-2xl mx-auto"
         style={{
           background: 'linear-gradient(135deg, #0a0a12 0%, #1a1a2e 50%, #0a0a12 100%)',
           border: '1px solid rgba(255, 215, 0, 0.2)',
+          maxWidth: '360px',
         }}
       >
         {/* 标题 */}
@@ -143,7 +146,7 @@ export function ShareCard() {
       </div>
 
       {/* 下载按钮 */}
-      <div className="text-center">
+      <div className="text-center mt-4">
         <Button onClick={handleDownload} disabled={generating}>
           {generating ? '生成中...' : '下载分享图'}
         </Button>

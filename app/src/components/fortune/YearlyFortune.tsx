@@ -121,42 +121,54 @@ ${yearlyInfo}
   if (!chart) return null
 
   return (
-    <div className="glass p-6 w-full max-w-4xl mx-auto">
-      <h2 className="text-xl font-semibold text-amber mb-4">年度运势</h2>
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      {/* 左侧：控制面板 */}
+      <div className="lg:col-span-1">
+        <div className="glass p-6 space-y-4">
+          <h2 className="text-xl font-semibold text-amber">年度运势</h2>
 
-      <div className="flex gap-4 mb-4">
-        <Select
-          options={YEAR_OPTIONS}
-          value={year}
-          onChange={(e) => setYear(Number(e.target.value))}
-          className="w-32"
-        />
-        <Button
-          onClick={handleAnalyze}
-          disabled={loading || !currentSettings.apiKey}
-        >
-          {loading ? '分析中...' : '查看运势'}
-        </Button>
+          <Select
+            label="选择年份"
+            options={YEAR_OPTIONS}
+            value={year}
+            onChange={(e) => setYear(Number(e.target.value))}
+          />
+
+          <Button
+            onClick={handleAnalyze}
+            disabled={loading || !currentSettings.apiKey}
+            className="w-full"
+          >
+            {loading ? '分析中...' : '查看运势'}
+          </Button>
+
+          {error && (
+            <div className="p-3 rounded-lg bg-misfortune/10 text-misfortune text-sm">
+              {error}
+            </div>
+          )}
+        </div>
       </div>
 
-      {error && (
-        <div className="p-3 rounded-lg bg-misfortune/10 text-misfortune text-sm mb-4">
-          {error}
+      {/* 右侧：运势结果 */}
+      <div className="lg:col-span-2">
+        <div className="glass p-6 h-full min-h-[400px]">
+          {fortune ? (
+            <div className="text-text-secondary whitespace-pre-wrap leading-relaxed">
+              {fortune}
+            </div>
+          ) : loading ? (
+            <div className="flex items-center justify-center h-full gap-2 text-text-muted">
+              <div className="w-4 h-4 border-2 border-star border-t-transparent rounded-full animate-spin" />
+              <span>正在分析 {year} 年运势...</span>
+            </div>
+          ) : (
+            <div className="flex items-center justify-center h-full text-text-muted">
+              选择年份并点击「查看运势」开始分析
+            </div>
+          )}
         </div>
-      )}
-
-      {fortune && (
-        <div className="text-text-secondary whitespace-pre-wrap leading-relaxed">
-          {fortune}
-        </div>
-      )}
-
-      {loading && !fortune && (
-        <div className="flex items-center gap-2 text-text-muted">
-          <div className="w-4 h-4 border-2 border-star border-t-transparent rounded-full animate-spin" />
-          <span>正在分析 {year} 年运势...</span>
-        </div>
-      )}
+      </div>
     </div>
   )
 }

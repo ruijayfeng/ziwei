@@ -59,7 +59,7 @@ export function BirthForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="glass glass-glow p-6 w-full max-w-md mx-auto">
+    <form onSubmit={handleSubmit} className="glass glass-glow p-8 w-full max-w-lg">
       <h2 className="text-xl font-semibold mb-6 text-center">输入您的出生信息</h2>
 
       <div className="space-y-4">

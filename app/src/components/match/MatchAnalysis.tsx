@@ -227,46 +227,49 @@ ${context2}
   }, [person1, person2, provider, currentSettings, enableThinking, enableWebSearch, searchApiKey])
 
   return (
-    <div className="w-full max-w-4xl mx-auto space-y-4">
-      {/* 双人输入 */}
-      <div className="flex gap-4 flex-col md:flex-row">
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      {/* 左侧：双人输入 */}
+      <div className="lg:col-span-1 space-y-4">
         <PersonInput label="第一人" value={person1} onChange={setPerson1} />
         <PersonInput label="第二人" value={person2} onChange={setPerson2} />
-      </div>
 
-      {/* 分析按钮 */}
-      <div className="text-center">
         <Button
           onClick={handleAnalyze}
           disabled={loading || !currentSettings.apiKey}
-          size="lg"
+          className="w-full"
         >
           {loading ? '分析中...' : currentSettings.apiKey ? '开始合盘分析' : '请先配置 API'}
         </Button>
       </div>
 
-      {/* 结果展示 */}
-      {error && (
-        <div className="glass p-4 bg-misfortune/10 text-misfortune text-sm">
-          {error}
-        </div>
-      )}
-
-      {result && (
-        <div className="glass p-6">
-          <h2 className="text-xl font-semibold text-amber mb-4">合盘分析结果</h2>
-          <div className="text-text-secondary whitespace-pre-wrap leading-relaxed">
-            {result}
+      {/* 右侧：分析结果 */}
+      <div className="lg:col-span-2">
+        {error && (
+          <div className="glass p-4 bg-misfortune/10 text-misfortune text-sm mb-4">
+            {error}
           </div>
-        </div>
-      )}
+        )}
 
-      {loading && !result && (
-        <div className="glass p-6 flex items-center justify-center gap-2 text-text-muted">
-          <div className="w-4 h-4 border-2 border-star border-t-transparent rounded-full animate-spin" />
-          <span>正在分析两人契合度...</span>
+        <div className="glass p-6 h-full min-h-[500px]">
+          {result ? (
+            <>
+              <h2 className="text-xl font-semibold text-amber mb-4">合盘分析结果</h2>
+              <div className="text-text-secondary whitespace-pre-wrap leading-relaxed">
+                {result}
+              </div>
+            </>
+          ) : loading ? (
+            <div className="flex items-center justify-center h-full gap-2 text-text-muted">
+              <div className="w-4 h-4 border-2 border-star border-t-transparent rounded-full animate-spin" />
+              <span>正在分析两人契合度...</span>
+            </div>
+          ) : (
+            <div className="flex items-center justify-center h-full text-text-muted">
+              输入双方信息并点击「开始合盘分析」
+            </div>
+          )}
         </div>
-      )}
+      </div>
     </div>
   )
 }

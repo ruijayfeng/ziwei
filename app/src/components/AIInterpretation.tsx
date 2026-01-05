@@ -105,7 +105,7 @@ ${contextStr}
   if (!chart) return null
 
   return (
-    <div className="glass p-6 w-full max-w-4xl mx-auto mt-6">
+    <div className="glass p-6 h-full">
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-xl font-semibold text-amber">AI 命盘解读</h2>
         <Button

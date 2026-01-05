@@ -26,21 +26,43 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<TabType>('chart')
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen flex flex-col">
       {/* 星点背景 */}
       <div className="star-bg" />
 
       {/* 头部 */}
-      <header className="py-8 px-4">
-        <div className="max-w-4xl mx-auto flex items-center justify-between">
-          <div className="text-center flex-1">
-            <h1 className="text-3xl font-bold bg-gradient-to-r from-star-light to-amber bg-clip-text text-transparent">
-              紫微知道
-            </h1>
-            <p className="text-text-secondary mt-2">
-              基于紫微斗数的 AI 命理工具
-            </p>
+      <header className="py-6 px-6 lg:px-12 border-b border-white/5">
+        <div className="max-w-[1600px] mx-auto flex items-center justify-between">
+          <div className="flex items-center gap-8">
+            <div>
+              <h1 className="text-2xl font-bold bg-gradient-to-r from-star-light to-amber bg-clip-text text-transparent">
+                紫微知道
+              </h1>
+              <p className="text-text-muted text-sm mt-0.5">
+                基于紫微斗数的 AI 命理工具
+              </p>
+            </div>
+
+            {/* 标签导航 - 桌面端 */}
+            <nav className="hidden md:flex gap-1">
+              {TABS.map((tab) => (
+                <button
+                  key={tab.key}
+                  onClick={() => setActiveTab(tab.key)}
+                  className={`
+                    px-4 py-2 rounded-lg text-sm font-medium transition-all
+                    ${activeTab === tab.key
+                      ? 'bg-star text-white'
+                      : 'text-text-muted hover:text-text hover:bg-white/5'
+                    }
+                  `}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </nav>
           </div>
+
           <button
             onClick={() => setShowSettings(true)}
             className="p-2 rounded-lg hover:bg-white/5 transition-colors text-text-muted hover:text-text"
@@ -54,9 +76,9 @@ export default function App() {
         </div>
       </header>
 
-      {/* 标签栏 */}
-      <nav className="px-4 mb-6">
-        <div className="max-w-4xl mx-auto flex gap-2 justify-center">
+      {/* 移动端标签栏 */}
+      <nav className="md:hidden px-4 py-3 border-b border-white/5">
+        <div className="flex gap-2 justify-center">
           {TABS.map((tab) => (
             <button
               key={tab.key}
@@ -76,47 +98,65 @@ export default function App() {
       </nav>
 
       {/* 主内容 */}
-      <main className="px-4 pb-12">
-        {/* 命盘解读标签 */}
-        {activeTab === 'chart' && (
-          !chart ? (
-            <BirthForm />
-          ) : (
-            <div className="space-y-6 animate-fade-in">
-              <ChartDisplay />
-              <AIInterpretation />
-              <ShareCard />
-              <div className="text-center">
-                <button
-                  onClick={() => useChartStore.getState().clear()}
-                  className="text-sm text-text-muted hover:text-text-secondary transition-colors"
-                >
-                  ← 重新输入
-                </button>
+      <main className="flex-1 px-4 lg:px-12 py-8">
+        <div className="max-w-[1600px] mx-auto">
+          {/* 命盘解读标签 */}
+          {activeTab === 'chart' && (
+            !chart ? (
+              <div className="flex items-center justify-center min-h-[60vh]">
+                <BirthForm />
               </div>
-            </div>
-          )
-        )}
+            ) : (
+              <div className="animate-fade-in">
+                {/* 双栏布局：命盘 + AI 解读 */}
+                <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
+                  {/* 左侧：命盘 */}
+                  <div className="space-y-6">
+                    <ChartDisplay />
+                    <ShareCard />
+                  </div>
 
-        {/* 年度运势标签 */}
-        {activeTab === 'fortune' && (
-          !chart ? (
-            <div className="text-center">
-              <p className="text-text-muted mb-4">请先在「命盘解读」中输入您的生辰信息</p>
-              <button
-                onClick={() => setActiveTab('chart')}
-                className="text-star hover:text-star-light transition-colors"
-              >
-                前往输入 →
-              </button>
-            </div>
-          ) : (
-            <YearlyFortune />
-          )
-        )}
+                  {/* 右侧：AI 解读 */}
+                  <div>
+                    <AIInterpretation />
+                  </div>
+                </div>
 
-        {/* 双人合盘标签 */}
-        {activeTab === 'match' && <MatchAnalysis />}
+                {/* 重新输入按钮 */}
+                <div className="text-center mt-8">
+                  <button
+                    onClick={() => useChartStore.getState().clear()}
+                    className="text-sm text-text-muted hover:text-text-secondary transition-colors"
+                  >
+                    ← 重新输入
+                  </button>
+                </div>
+              </div>
+            )
+          )}
+
+          {/* 年度运势标签 */}
+          {activeTab === 'fortune' && (
+            !chart ? (
+              <div className="flex items-center justify-center min-h-[60vh]">
+                <div className="text-center">
+                  <p className="text-text-muted mb-4">请先在「命盘解读」中输入您的生辰信息</p>
+                  <button
+                    onClick={() => setActiveTab('chart')}
+                    className="text-star hover:text-star-light transition-colors"
+                  >
+                    前往输入 →
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <YearlyFortune />
+            )
+          )}
+
+          {/* 双人合盘标签 */}
+          {activeTab === 'match' && <MatchAnalysis />}
+        </div>
       </main>
 
       {/* 设置弹窗 */}
@@ -127,7 +167,7 @@ export default function App() {
       )}
 
       {/* 底部 */}
-      <footer className="py-6 text-center text-text-muted text-sm">
+      <footer className="py-6 text-center text-text-muted text-sm border-t border-white/5">
         <p>紫微知道 · 开源命理工具</p>
       </footer>
     </div>

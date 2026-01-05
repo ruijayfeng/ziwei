@@ -192,7 +192,7 @@ export function ChartDisplay() {
   const fiveElement = chart.fiveElementsClass || '---'
 
   return (
-    <div className="w-full max-w-4xl mx-auto p-4">
+    <div className="glass p-4 lg:p-6">
       <div className="grid grid-cols-4 gap-2">
         {/* 第一行 */}
         {grid[0].map((palace, col) => (
