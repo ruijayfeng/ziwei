@@ -147,7 +147,8 @@ function PersonInput({ label, value, onChange }: PersonInputProps) {
    ------------------------------------------------------------ */
 
 export function MatchAnalysis() {
-  const { apiKey, model: provider, customEndpoint } = useSettingsStore()
+  const { provider, providerSettings, enableThinking } = useSettingsStore()
+  const currentSettings = providerSettings[provider]
 
   const [person1, setPerson1] = useState<BirthInfo>({
     year: 1990, month: 1, day: 1, hour: 12, gender: 'male',
@@ -160,7 +161,7 @@ export function MatchAnalysis() {
   const [error, setError] = useState<string | null>(null)
 
   const handleAnalyze = useCallback(async () => {
-    if (!apiKey) {
+    if (!currentSettings.apiKey) {
       setError('请先在设置中配置 API Key')
       return
     }
@@ -205,8 +206,10 @@ ${context2}
 
       const config: LLMConfig = {
         provider,
-        apiKey,
-        baseUrl: provider === 'custom' ? customEndpoint : undefined,
+        apiKey: currentSettings.apiKey,
+        baseUrl: currentSettings.customBaseUrl || undefined,
+        model: currentSettings.customModel || undefined,
+        enableThinking,
       }
 
       let fullText = ''
@@ -219,7 +222,7 @@ ${context2}
     } finally {
       setLoading(false)
     }
-  }, [person1, person2, apiKey, provider, customEndpoint])
+  }, [person1, person2, provider, currentSettings, enableThinking])
 
   return (
     <div className="w-full max-w-4xl mx-auto space-y-4">
@@ -233,10 +236,10 @@ ${context2}
       <div className="text-center">
         <Button
           onClick={handleAnalyze}
-          disabled={loading || !apiKey}
+          disabled={loading || !currentSettings.apiKey}
           size="lg"
         >
-          {loading ? '分析中...' : apiKey ? '开始合盘分析' : '请先配置 API'}
+          {loading ? '分析中...' : currentSettings.apiKey ? '开始合盘分析' : '请先配置 API'}
         </Button>
       </div>
 

@@ -63,7 +63,11 @@ export function BirthForm() {
       <h2 className="text-xl font-semibold mb-6 text-center">输入您的出生信息</h2>
 
       <div className="space-y-4">
-        {/* 出生日期 */}
+        {/* 出生日期（阳历） */}
+        <div className="flex items-center justify-between mb-1">
+          <span className="text-sm text-text-secondary">出生日期</span>
+          <span className="text-xs text-amber px-2 py-0.5 rounded bg-amber/10">阳历</span>
+        </div>
         <div className="grid grid-cols-3 gap-3">
           <Select
             label="年"
@@ -135,7 +139,7 @@ export function BirthForm() {
       </div>
 
       <p className="text-xs text-text-muted text-center mt-4">
-        紫微斗数使用农历时间，系统会自动转换
+        请输入阳历（公历）日期，系统会自动转为农历排盘
       </p>
     </form>
   )

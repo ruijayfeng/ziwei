@@ -46,7 +46,8 @@ const FORTUNE_PROMPT = `你是一位精通紫微斗数的命理师。现在需�
 
 export function YearlyFortune() {
   const { chart, birthInfo } = useChartStore()
-  const { apiKey, model: provider, customEndpoint } = useSettingsStore()
+  const { provider, providerSettings, enableThinking } = useSettingsStore()
+  const currentSettings = providerSettings[provider]
 
   const [year, setYear] = useState(currentYear)
   const [fortune, setFortune] = useState('')
@@ -55,7 +56,7 @@ export function YearlyFortune() {
 
   const handleAnalyze = useCallback(async () => {
     if (!chart || !birthInfo) return
-    if (!apiKey) {
+    if (!currentSettings.apiKey) {
       setError('请先在设置中配置 API Key')
       return
     }
@@ -97,8 +98,10 @@ ${yearlyInfo}
 
       const config: LLMConfig = {
         provider,
-        apiKey,
-        baseUrl: provider === 'custom' ? customEndpoint : undefined,
+        apiKey: currentSettings.apiKey,
+        baseUrl: currentSettings.customBaseUrl || undefined,
+        model: currentSettings.customModel || undefined,
+        enableThinking,
       }
 
       let fullText = ''
@@ -111,7 +114,7 @@ ${yearlyInfo}
     } finally {
       setLoading(false)
     }
-  }, [chart, birthInfo, year, apiKey, provider, customEndpoint])
+  }, [chart, birthInfo, year, provider, currentSettings, enableThinking])
 
   if (!chart) return null
 
@@ -128,7 +131,7 @@ ${yearlyInfo}
         />
         <Button
           onClick={handleAnalyze}
-          disabled={loading || !apiKey}
+          disabled={loading || !currentSettings.apiKey}
         >
           {loading ? '分析中...' : '查看运势'}
         </Button>

@@ -76,7 +76,7 @@ export function ShareCard() {
         {/* 标题 */}
         <div className="text-center mb-4">
           <h2 className="text-2xl font-bold bg-gradient-to-r from-amber-300 to-amber-500 bg-clip-text text-transparent">
-            紫微斗数命盘
+            Ziwei 命盘
           </h2>
           <p className="text-amber-400/60 text-sm mt-1">
             {birthInfo.year}年{birthInfo.month}月{birthInfo.day}日 · {birthInfo.gender === 'male' ? '乾造' : '坤造'}
@@ -138,7 +138,7 @@ export function ShareCard() {
 
         {/* 底部水印 */}
         <div className="text-center mt-4 pt-3 border-t border-amber-400/10">
-          <p className="text-amber-400/40 text-xs">紫微斗数 · 开源命理工具</p>
+          <p className="text-amber-400/40 text-xs">Ziwei · 开源命理工具</p>
         </div>
       </div>
 

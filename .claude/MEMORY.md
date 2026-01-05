@@ -5,9 +5,31 @@
 ## 当前状态
 
 ```
-[MVP 已完成] 2026-01-05
-所有核心功能开发完毕，可进入迭代优化阶段
+[迭代优化完成] 2026-01-05
+品牌升级 + 设置面板重构 + 多模型思考模式
 ```
+
+## 变更日志
+
+### 2026-01-05 迭代优化
+**品牌升级**
+- 产品名: "紫微斗数" → "Ziwei"
+- 副标题: "基于紫微斗数的 AI 命理工具"
+- 表单: 明确标注"阳历"，底部提示更清晰
+
+**设置面板重构**
+- 高级设置折叠区，支持自定义 BaseURL/Model
+- 每厂商独立配置：apiKey/baseUrl/model 按厂商存储
+- 未保存修改提示：切换厂商时弹窗确认
+- 输入框高亮：修改后 amber 边框
+
+**多模型思考模式**
+| 厂商 | 默认模型 | 思考模型 |
+|------|----------|----------|
+| Kimi | kimi-k2-0905-preview | kimi-k2-thinking |
+| Gemini | gemini-3.0-flash | gemini-3-pro-preview |
+| Claude | claude-opus-4-5-20251124 | extended thinking |
+| DeepSeek | deepseek-chat | deepseek-v3.2-speciale |
 
 ## 开发进度
 

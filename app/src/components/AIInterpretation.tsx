@@ -39,7 +39,8 @@ const SYSTEM_PROMPT = `你是一位精通紫微斗数的命理师，名为"星�
 
 export function AIInterpretation() {
   const { chart, birthInfo } = useChartStore()
-  const { apiKey, model: provider, customEndpoint } = useSettingsStore()
+  const { provider, providerSettings, enableThinking } = useSettingsStore()
+  const currentSettings = providerSettings[provider]
 
   const [interpretation, setInterpretation] = useState('')
   const [loading, setLoading] = useState(false)
@@ -47,7 +48,7 @@ export function AIInterpretation() {
 
   const handleInterpret = useCallback(async () => {
     if (!chart || !birthInfo) return
-    if (!apiKey) {
+    if (!currentSettings.apiKey) {
       setError('请先在设置中配置 API Key')
       return
     }
@@ -80,8 +81,10 @@ ${contextStr}
 
       const config: LLMConfig = {
         provider,
-        apiKey,
-        baseUrl: provider === 'custom' ? customEndpoint : undefined,
+        apiKey: currentSettings.apiKey,
+        baseUrl: currentSettings.customBaseUrl || undefined,
+        model: currentSettings.customModel || undefined,
+        enableThinking,
       }
 
       // 流式输出
@@ -95,7 +98,7 @@ ${contextStr}
     } finally {
       setLoading(false)
     }
-  }, [chart, birthInfo, apiKey, provider, customEndpoint])
+  }, [chart, birthInfo, provider, currentSettings, enableThinking])
 
   if (!chart) return null
 
@@ -105,10 +108,10 @@ ${contextStr}
         <h2 className="text-xl font-semibold text-amber">AI 命盘解读</h2>
         <Button
           onClick={handleInterpret}
-          disabled={loading || !apiKey}
+          disabled={loading || !currentSettings.apiKey}
           size="sm"
         >
-          {loading ? '解读中...' : apiKey ? '开始解读' : '请先配置 API'}
+          {loading ? '解读中...' : currentSettings.apiKey ? '开始解读' : '请先配置 API'}
         </Button>
       </div>
 
@@ -118,7 +121,7 @@ ${contextStr}
         </div>
       )}
 
-      {!apiKey && !interpretation && (
+      {!currentSettings.apiKey && !interpretation && (
         <div className="text-text-muted text-sm">
           请先在设置中配置 AI 模型的 API Key，即可获得深度命盘解读。
         </div>

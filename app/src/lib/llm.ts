@@ -10,6 +10,7 @@ export interface LLMConfig {
   apiKey: string
   baseUrl?: string
   model?: string
+  enableThinking?: boolean
 }
 
 export interface ChatMessage {
@@ -24,21 +25,21 @@ export interface StreamCallbacks {
 }
 
 /* ------------------------------------------------------------
-   Provider 配置
+   Provider 配置（导出供设置面板使用）
    ------------------------------------------------------------ */
 
-const PROVIDER_CONFIGS: Record<ModelProvider, { baseUrl: string; defaultModel: string }> = {
+export const PROVIDER_CONFIGS: Record<ModelProvider, { baseUrl: string; defaultModel: string }> = {
   kimi: {
     baseUrl: 'https://api.moonshot.cn/v1',
-    defaultModel: 'moonshot-v1-8k',
+    defaultModel: 'kimi-k2-0905-preview',
   },
   gemini: {
     baseUrl: 'https://generativelanguage.googleapis.com/v1beta',
-    defaultModel: 'gemini-1.5-flash',
+    defaultModel: 'gemini-3.0-flash',
   },
   claude: {
     baseUrl: 'https://api.anthropic.com/v1',
-    defaultModel: 'claude-3-5-sonnet-20241022',
+    defaultModel: 'claude-opus-4-5-20251124',
   },
   deepseek: {
     baseUrl: 'https://api.deepseek.com/v1',
@@ -46,7 +47,7 @@ const PROVIDER_CONFIGS: Record<ModelProvider, { baseUrl: string; defaultModel: s
   },
   custom: {
     baseUrl: '',
-    defaultModel: 'gpt-3.5-turbo',
+    defaultModel: '',
   },
 }
 
@@ -58,8 +59,18 @@ async function* streamOpenAICompatible(
   config: LLMConfig,
   messages: ChatMessage[]
 ): AsyncGenerator<string> {
-  const { provider, apiKey, baseUrl, model } = config
+  const { provider, apiKey, baseUrl, model, enableThinking } = config
   const providerConfig = PROVIDER_CONFIGS[provider]
+
+  // 确定使用的模型（思考模式切换专用模型）
+  let useModel = model || providerConfig.defaultModel
+  if (enableThinking && !model) {
+    if (provider === 'deepseek') {
+      useModel = 'deepseek-v3.2-speciale'
+    } else if (provider === 'kimi') {
+      useModel = 'kimi-k2-thinking'
+    }
+  }
 
   const url = `${baseUrl || providerConfig.baseUrl}/chat/completions`
 
@@ -70,7 +81,7 @@ async function* streamOpenAICompatible(
       'Authorization': `Bearer ${apiKey}`,
     },
     body: JSON.stringify({
-      model: model || providerConfig.defaultModel,
+      model: useModel,
       messages,
       stream: true,
     }),
@@ -118,8 +129,14 @@ async function* streamGemini(
   config: LLMConfig,
   messages: ChatMessage[]
 ): AsyncGenerator<string> {
-  const { apiKey, model } = config
-  const modelName = model || PROVIDER_CONFIGS.gemini.defaultModel
+  const { apiKey, model, baseUrl, enableThinking } = config
+  const providerConfig = PROVIDER_CONFIGS.gemini
+
+  // 思考模式切换到 gemini-3-pro-preview
+  let modelName = model || providerConfig.defaultModel
+  if (enableThinking && !model) {
+    modelName = 'gemini-3-pro-preview'
+  }
 
   // 转换消息格式
   const contents = messages
@@ -132,7 +149,7 @@ async function* streamGemini(
   // 系统消息作为 systemInstruction
   const systemMessage = messages.find(m => m.role === 'system')
 
-  const url = `${PROVIDER_CONFIGS.gemini.baseUrl}/models/${modelName}:streamGenerateContent?key=${apiKey}`
+  const url = `${baseUrl || providerConfig.baseUrl}/models/${modelName}:streamGenerateContent?key=${apiKey}`
 
   const response = await fetch(url, {
     method: 'POST',
@@ -178,33 +195,45 @@ async function* streamGemini(
 }
 
 /* ------------------------------------------------------------
-   Claude API 请求
+   Claude API 请求（支持 extended thinking）
    ------------------------------------------------------------ */
 
 async function* streamClaude(
   config: LLMConfig,
   messages: ChatMessage[]
 ): AsyncGenerator<string> {
-  const { apiKey, model } = config
+  const { apiKey, model, baseUrl, enableThinking } = config
+  const providerConfig = PROVIDER_CONFIGS.claude
 
   // 提取系统消息
   const systemMessage = messages.find(m => m.role === 'system')?.content || ''
   const chatMessages = messages.filter(m => m.role !== 'system')
 
-  const response = await fetch(`${PROVIDER_CONFIGS.claude.baseUrl}/messages`, {
+  // 构建请求体
+  const requestBody: Record<string, unknown> = {
+    model: model || providerConfig.defaultModel,
+    max_tokens: enableThinking ? 16000 : 4096,
+    system: systemMessage,
+    messages: chatMessages,
+    stream: true,
+  }
+
+  // 如果启用思考模式
+  if (enableThinking) {
+    requestBody.thinking = {
+      type: 'enabled',
+      budget_tokens: 10000,
+    }
+  }
+
+  const response = await fetch(`${baseUrl || providerConfig.baseUrl}/messages`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       'x-api-key': apiKey,
       'anthropic-version': '2023-06-01',
     },
-    body: JSON.stringify({
-      model: model || PROVIDER_CONFIGS.claude.defaultModel,
-      max_tokens: 4096,
-      system: systemMessage,
-      messages: chatMessages,
-      stream: true,
-    }),
+    body: JSON.stringify(requestBody),
   })
 
   if (!response.ok) {
@@ -229,8 +258,12 @@ async function* streamClaude(
       if (line.startsWith('data: ')) {
         try {
           const json = JSON.parse(line.slice(6))
+          // 处理普通文本输出
           if (json.type === 'content_block_delta') {
-            yield json.delta?.text || ''
+            if (json.delta?.type === 'text_delta') {
+              yield json.delta.text || ''
+            }
+            // thinking 内容也可以选择输出（当前跳过）
           }
         } catch {
           // 忽略
