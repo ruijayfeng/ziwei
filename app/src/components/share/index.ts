@@ -1,0 +1,1 @@
+export { ShareCard } from './ShareCard'

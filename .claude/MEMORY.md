@@ -7,7 +7,7 @@
 ```
 [完成] P1: 核心排盘 + 基础UI
 [完成] P2: AI 解读 + 知识库
-[待做] P3: 年度运势 + 双人合盘
+[完成] P3: 年度运势 + 双人合盘
 [待做] P4: 分享卡片 + 打磨
 ```
 
@@ -17,7 +17,7 @@
 |------|------|--------|
 | P1 | ✅ | `863b7cb` |
 | P2 | ✅ | `7855b2a` |
-| P3 | ⏳ | - |
+| P3 | ✅ | `0de45af` |
 | P4 | ⏳ | - |
 
 ## 架构地图
@@ -33,6 +33,8 @@ zwds/
 │   │   ├── components/        # UI 组件
 │   │   │   ├── ui/           # 基础组件 (Button/Input/Select)
 │   │   │   ├── chart/        # 命盘组件 (ChartDisplay)
+│   │   │   ├── fortune/      # 年度运势 (YearlyFortune)
+│   │   │   ├── match/        # 双人合盘 (MatchAnalysis)
 │   │   │   ├── BirthForm.tsx # 生辰输入
 │   │   │   ├── AIInterpretation.tsx # AI 解读
 │   │   │   └── SettingsPanel.tsx    # 设置面板
@@ -65,5 +67,7 @@ zwds/
 | `lib/llm.ts` | 多模型适配层，统一流式 API |
 | `knowledge/` | 结构化知识库 + RAG 检索 |
 | `components/chart/` | 命盘可视化（十二宫布局） |
+| `components/fortune/` | 年度运势分析 |
+| `components/match/` | 双人合盘分析 |
 | `components/AIInterpretation` | AI 解读面板 |
 | `stores/` | 全局状态（命盘、设置） |

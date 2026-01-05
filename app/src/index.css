@@ -90,6 +90,21 @@ body {
   50% { opacity: 1; }
 }
 
+@keyframes twinkle-slow {
+  0%, 100% { opacity: 0.2; }
+  50% { opacity: 0.8; }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pulse-soft {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
 .star-bg {
   position: fixed;
   top: 0;
@@ -120,6 +135,43 @@ body {
     150px 300px 0 rgba(255,255,255,0.4),
     350px 350px 0 rgba(255,255,255,0.5),
     550px 280px 0 rgba(255,255,255,0.3),
-    750px 320px 0 rgba(255,255,255,0.4);
+    750px 320px 0 rgba(255,255,255,0.4),
+    50px 450px 0 rgba(255,255,255,0.3),
+    250px 500px 0 rgba(255,255,255,0.4),
+    450px 420px 0 rgba(255,255,255,0.5),
+    650px 480px 0 rgba(255,255,255,0.3),
+    850px 400px 0 rgba(255,255,255,0.4),
+    950px 150px 0 rgba(255,255,255,0.3),
+    1050px 300px 0 rgba(255,255,255,0.5),
+    1150px 100px 0 rgba(255,255,255,0.4);
   animation: twinkle 4s ease-in-out infinite;
+}
+
+.star-bg::after {
+  content: '';
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  background: rgba(255, 215, 0, 0.6);
+  border-radius: 50%;
+  box-shadow:
+    180px 100px 0 rgba(255, 215, 0, 0.4),
+    380px 250px 0 rgba(255, 215, 0, 0.3),
+    580px 50px 0 rgba(255, 215, 0, 0.5),
+    780px 300px 0 rgba(255, 215, 0, 0.4),
+    280px 400px 0 rgba(255, 215, 0, 0.3),
+    480px 150px 0 rgba(255, 215, 0, 0.5);
+  animation: twinkle-slow 6s ease-in-out infinite;
+}
+
+/* ============================================================
+   动画工具类
+   ============================================================ */
+
+.animate-fade-in {
+  animation: fade-in 0.4s ease-out;
+}
+
+.animate-pulse-soft {
+  animation: pulse-soft 2s ease-in-out infinite;
 }

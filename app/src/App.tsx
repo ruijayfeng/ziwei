@@ -9,6 +9,7 @@ import { AIInterpretation } from '@/components/AIInterpretation'
 import { SettingsPanel } from '@/components/SettingsPanel'
 import { YearlyFortune } from '@/components/fortune'
 import { MatchAnalysis } from '@/components/match'
+import { ShareCard } from '@/components/share'
 import { useChartStore } from '@/stores'
 
 type TabType = 'chart' | 'fortune' | 'match'
@@ -81,9 +82,10 @@ export default function App() {
           !chart ? (
             <BirthForm />
           ) : (
-            <div className="space-y-6">
+            <div className="space-y-6 animate-fade-in">
               <ChartDisplay />
               <AIInterpretation />
+              <ShareCard />
               <div className="text-center">
                 <button
                   onClick={() => useChartStore.getState().clear()}
