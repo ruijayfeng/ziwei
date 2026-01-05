@@ -2,12 +2,16 @@
    紫微斗数 App - 主入口
    ============================================================ */
 
+import { useState } from 'react'
 import { BirthForm } from '@/components/BirthForm'
 import { ChartDisplay } from '@/components/chart'
+import { AIInterpretation } from '@/components/AIInterpretation'
+import { SettingsPanel } from '@/components/SettingsPanel'
 import { useChartStore } from '@/stores'
 
 export default function App() {
   const { chart } = useChartStore()
+  const [showSettings, setShowSettings] = useState(false)
 
   return (
     <div className="min-h-screen">
@@ -16,13 +20,25 @@ export default function App() {
 
       {/* 头部 */}
       <header className="py-8 px-4">
-        <div className="max-w-4xl mx-auto text-center">
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-star-light to-amber bg-clip-text text-transparent">
-            紫微斗数
-          </h1>
-          <p className="text-text-secondary mt-2">
-            探索你的命运星图
-          </p>
+        <div className="max-w-4xl mx-auto flex items-center justify-between">
+          <div className="text-center flex-1">
+            <h1 className="text-3xl font-bold bg-gradient-to-r from-star-light to-amber bg-clip-text text-transparent">
+              紫微斗数
+            </h1>
+            <p className="text-text-secondary mt-2">
+              探索你的命运星图
+            </p>
+          </div>
+          <button
+            onClick={() => setShowSettings(true)}
+            className="p-2 rounded-lg hover:bg-white/5 transition-colors text-text-muted hover:text-text"
+            title="设置"
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+          </button>
         </div>
       </header>
 
@@ -32,9 +48,10 @@ export default function App() {
           /* 未排盘：显示输入表单 */
           <BirthForm />
         ) : (
-          /* 已排盘：显示命盘 */
+          /* 已排盘：显示命盘 + AI 解读 */
           <div className="space-y-6">
             <ChartDisplay />
+            <AIInterpretation />
 
             {/* 重新排盘按钮 */}
             <div className="text-center">
@@ -48,6 +65,13 @@ export default function App() {
           </div>
         )}
       </main>
+
+      {/* 设置弹窗 */}
+      {showSettings && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <SettingsPanel onClose={() => setShowSettings(false)} />
+        </div>
+      )}
 
       {/* 底部 */}
       <footer className="py-6 text-center text-text-muted text-sm">
