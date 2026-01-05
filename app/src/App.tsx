@@ -12,12 +12,13 @@ import { MatchAnalysis } from '@/components/match'
 import { ShareCard } from '@/components/share'
 import { useChartStore } from '@/stores'
 
-type TabType = 'chart' | 'fortune' | 'match'
+type TabType = 'chart' | 'fortune' | 'match' | 'share'
 
 const TABS: Array<{ key: TabType; label: string; needsChart: boolean }> = [
   { key: 'chart', label: '命盘解读', needsChart: true },
   { key: 'fortune', label: '年度运势', needsChart: true },
   { key: 'match', label: '双人合盘', needsChart: false },
+  { key: 'share', label: '分享卡片', needsChart: true },
 ]
 
 export default function App() {
@@ -111,9 +112,8 @@ export default function App() {
                 {/* 双栏布局：命盘 + AI 解读 */}
                 <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
                   {/* 左侧：命盘 */}
-                  <div className="space-y-6">
+                  <div>
                     <ChartDisplay />
-                    <ShareCard />
                   </div>
 
                   {/* 右侧：AI 解读 */}
@@ -156,6 +156,27 @@ export default function App() {
 
           {/* 双人合盘标签 */}
           {activeTab === 'match' && <MatchAnalysis />}
+
+          {/* 分享卡片标签 */}
+          {activeTab === 'share' && (
+            !chart ? (
+              <div className="flex items-center justify-center min-h-[60vh]">
+                <div className="text-center">
+                  <p className="text-text-muted mb-4">请先在「命盘解读」中输入您的生辰信息</p>
+                  <button
+                    onClick={() => setActiveTab('chart')}
+                    className="text-star hover:text-star-light transition-colors"
+                  >
+                    前往输入 →
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="max-w-xl mx-auto">
+                <ShareCard />
+              </div>
+            )
+          )}
         </div>
       </main>
 
