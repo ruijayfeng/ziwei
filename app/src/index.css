@@ -6,23 +6,26 @@
    ============================================================ */
 
 @theme {
-  /* 主色调 */
-  --color-night: #1a1b3a;
-  --color-night-light: #252747;
-  --color-night-lighter: #2f3158;
+  /* 主色调 - 深邃夜空 */
+  --color-night: #0f0f23;
+  --color-night-light: #1a1b3a;
+  --color-night-lighter: #252747;
 
-  /* 强调色 */
-  --color-star: #6366f1;
-  --color-star-light: #818cf8;
-  --color-star-dark: #4f46e5;
+  /* 紫微星色 - 更偏紫的皇家气质 */
+  --color-star: #7c3aed;
+  --color-star-light: #a78bfa;
+  --color-star-dark: #6d28d9;
 
-  /* 温暖点缀 */
-  --color-amber: #f59e0b;
-  --color-amber-light: #fbbf24;
-  --color-amber-dark: #d97706;
+  /* 真金色 - 奢华命理风 */
+  --color-gold: #D4AF37;
+  --color-gold-light: #F4D03F;
+  --color-gold-dark: #B8860B;
+  --color-amber: #D4AF37;
+  --color-amber-light: #F4D03F;
+  --color-amber-dark: #B8860B;
 
   /* 语义色 */
-  --color-fortune: #fbbf24;
+  --color-fortune: #F4D03F;
   --color-misfortune: #f87171;
   --color-neutral: #94a3b8;
 
@@ -35,9 +38,11 @@
   --color-glass: rgba(255, 255, 255, 0.08);
   --color-glass-border: rgba(255, 255, 255, 0.1);
 
-  /* 字体 */
-  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
-  --font-display: 'Inter', system-ui, -apple-system, sans-serif;
+  /* 字体 - 中英文混排优化 */
+  --font-sans: 'Noto Sans SC', 'Inter', system-ui, -apple-system, sans-serif;
+  --font-serif: 'Noto Serif SC', 'Georgia', serif;
+  --font-display: 'Noto Serif SC', 'Georgia', serif;
+  --font-brush: 'Ma Shan Zheng', 'STKaiti', 'KaiTi', cursive;
 }
 
 /* ============================================================
@@ -57,7 +62,10 @@ html {
 body {
   margin: 0;
   min-height: 100vh;
-  background: linear-gradient(135deg, var(--color-night) 0%, var(--color-night-light) 100%);
+  background:
+    radial-gradient(ellipse at 20% 0%, rgba(124, 58, 237, 0.15) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 100%, rgba(212, 175, 55, 0.1) 0%, transparent 50%),
+    linear-gradient(135deg, var(--color-night) 0%, var(--color-night-light) 50%, var(--color-night) 100%);
   color: var(--color-text);
 }
 
@@ -66,19 +74,46 @@ body {
 }
 
 /* ============================================================
-   毛玻璃卡片
+   毛玻璃卡片 - 增强版
    ============================================================ */
 
 .glass {
-  background: var(--color-glass);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid var(--color-glass-border);
+  background: rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 16px;
+  box-shadow:
+    0 4px 24px rgba(0, 0, 0, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 
 .glass-glow {
-  box-shadow: 0 0 20px rgba(99, 102, 241, 0.15);
+  box-shadow:
+    0 0 40px rgba(124, 58, 237, 0.15),
+    0 4px 24px rgba(0, 0, 0, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.glass-gold {
+  border-color: rgba(212, 175, 55, 0.2);
+  box-shadow:
+    0 0 30px rgba(212, 175, 55, 0.1),
+    0 4px 24px rgba(0, 0, 0, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+/* 悬停发光效果 */
+.hover-glow {
+  transition: box-shadow 0.3s ease, border-color 0.3s ease;
+}
+
+.hover-glow:hover {
+  box-shadow:
+    0 0 50px rgba(124, 58, 237, 0.2),
+    0 8px 32px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  border-color: rgba(124, 58, 237, 0.3);
 }
 
 /* ============================================================
@@ -103,6 +138,30 @@ body {
 @keyframes pulse-soft {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.6; }
+}
+
+@keyframes shimmer {
+  0% { background-position: 200% center; }
+  100% { background-position: -200% center; }
+}
+
+@keyframes aurora-drift {
+  0%, 100% {
+    transform: translate(0%, 0%) rotate(0deg);
+    opacity: 0.4;
+  }
+  25% {
+    transform: translate(5%, -5%) rotate(2deg);
+    opacity: 0.6;
+  }
+  50% {
+    transform: translate(-3%, 3%) rotate(-1deg);
+    opacity: 0.5;
+  }
+  75% {
+    transform: translate(2%, -2%) rotate(1deg);
+    opacity: 0.55;
+  }
 }
 
 .star-bg {
@@ -165,6 +224,48 @@ body {
 }
 
 /* ============================================================
+   Aurora 极光背景
+   ============================================================ */
+
+.aurora-bg {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: -2;
+}
+
+.aurora-bg::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background:
+    radial-gradient(ellipse 80% 50% at 20% 20%, rgba(124, 58, 237, 0.15) 0%, transparent 50%),
+    radial-gradient(ellipse 60% 40% at 80% 30%, rgba(167, 139, 250, 0.1) 0%, transparent 45%),
+    radial-gradient(ellipse 70% 60% at 60% 80%, rgba(212, 175, 55, 0.08) 0%, transparent 50%);
+  animation: aurora-drift 20s ease-in-out infinite;
+}
+
+.aurora-bg::after {
+  content: '';
+  position: absolute;
+  top: -30%;
+  left: -30%;
+  width: 160%;
+  height: 160%;
+  background:
+    radial-gradient(ellipse 50% 80% at 70% 60%, rgba(109, 40, 217, 0.12) 0%, transparent 50%),
+    radial-gradient(ellipse 40% 50% at 30% 70%, rgba(244, 208, 63, 0.06) 0%, transparent 45%);
+  animation: aurora-drift 25s ease-in-out infinite reverse;
+}
+
+/* ============================================================
    动画工具类
    ============================================================ */
 
@@ -174,4 +275,132 @@ body {
 
 .animate-pulse-soft {
   animation: pulse-soft 2s ease-in-out infinite;
+}
+
+/* ============================================================
+   交互增强
+   ============================================================ */
+
+/* 按钮基础样式 */
+.btn {
+  position: relative;
+  overflow: hidden;
+  transition: all 0.2s ease;
+}
+
+.btn::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(255,255,255,0.1) 0%, transparent 50%);
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.btn:hover::before {
+  opacity: 1;
+}
+
+.btn:active {
+  transform: scale(0.98);
+}
+
+/* 主要按钮 - 紫星渐变 */
+.btn-primary {
+  background: linear-gradient(135deg, var(--color-star) 0%, var(--color-star-dark) 100%);
+  box-shadow: 0 4px 16px rgba(124, 58, 237, 0.3);
+}
+
+.btn-primary:hover {
+  box-shadow: 0 6px 24px rgba(124, 58, 237, 0.4);
+}
+
+/* 金色按钮 */
+.btn-gold {
+  background: linear-gradient(135deg, var(--color-gold) 0%, var(--color-gold-dark) 100%);
+  color: #0f0f23;
+  box-shadow: 0 4px 16px rgba(212, 175, 55, 0.3);
+}
+
+.btn-gold:hover {
+  box-shadow: 0 6px 24px rgba(212, 175, 55, 0.4);
+}
+
+/* 卡片悬停提升 */
+.card-lift {
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.card-lift:hover {
+  transform: translateY(-4px);
+}
+
+/* 标签激活指示器 */
+.tab-indicator {
+  position: relative;
+}
+
+.tab-indicator::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 50%;
+  width: 0;
+  height: 2px;
+  background: linear-gradient(90deg, var(--color-star-light), var(--color-gold));
+  transition: all 0.3s ease;
+  transform: translateX(-50%);
+  border-radius: 1px;
+}
+
+.tab-indicator.active::after,
+.tab-indicator:hover::after {
+  width: 80%;
+}
+
+/* 输入框聚焦效果 */
+.input-glow {
+  transition: box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.input-glow:focus {
+  outline: none;
+  border-color: rgba(124, 58, 237, 0.5);
+  box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.15);
+}
+
+/* 流星动画（偶发） */
+@keyframes shooting-star {
+  0% {
+    transform: translateX(0) translateY(0);
+    opacity: 1;
+  }
+  70% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(300px) translateY(300px);
+    opacity: 0;
+  }
+}
+
+.shooting-star {
+  position: absolute;
+  width: 2px;
+  height: 2px;
+  background: linear-gradient(135deg, #fff 0%, rgba(212, 175, 55, 0.8) 100%);
+  border-radius: 50%;
+  box-shadow: 0 0 6px 2px rgba(255, 255, 255, 0.3);
+  animation: shooting-star 1.5s ease-out forwards;
+}
+
+.shooting-star::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  right: 0;
+  width: 60px;
+  height: 1px;
+  background: linear-gradient(90deg, rgba(255,255,255,0.6), transparent);
+  transform: translateY(-50%);
 }

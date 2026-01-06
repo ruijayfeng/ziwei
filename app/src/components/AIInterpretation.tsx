@@ -1,9 +1,11 @@
 /* ============================================================
    AI 解读组件
-   流式输出命盘分析结果
+   丝滑流式输出 + 书法字体 + Markdown 渲染
    ============================================================ */
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useRef, useEffect } from 'react'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import { useChartStore, useSettingsStore } from '@/stores'
 import { extractKnowledge, buildPromptContext } from '@/knowledge'
 import { streamChat, type ChatMessage, type LLMConfig } from '@/lib/llm'
@@ -34,6 +36,50 @@ const SYSTEM_PROMPT = `你是一位精通紫微斗数的命理师，名为"星�
 请根据提供的命盘信息进行解读。`
 
 /* ------------------------------------------------------------
+   字符输出速度（毫秒/字符）
+   ------------------------------------------------------------ */
+
+const CHAR_INTERVAL = 35
+
+/* ------------------------------------------------------------
+   Markdown 自定义样式组件
+   ------------------------------------------------------------ */
+
+const MarkdownComponents = {
+  h1: ({ children }: { children?: React.ReactNode }) => (
+    <h1 className="text-2xl font-bold text-gold mt-6 mb-3 first:mt-0">{children}</h1>
+  ),
+  h2: ({ children }: { children?: React.ReactNode }) => (
+    <h2 className="text-xl font-semibold text-gold/90 mt-5 mb-2">{children}</h2>
+  ),
+  h3: ({ children }: { children?: React.ReactNode }) => (
+    <h3 className="text-lg font-medium text-star-light mt-4 mb-2">{children}</h3>
+  ),
+  p: ({ children }: { children?: React.ReactNode }) => (
+    <p className="mb-3 leading-relaxed">{children}</p>
+  ),
+  strong: ({ children }: { children?: React.ReactNode }) => (
+    <strong className="text-gold font-semibold">{children}</strong>
+  ),
+  ul: ({ children }: { children?: React.ReactNode }) => (
+    <ul className="list-none space-y-1.5 mb-3 pl-4">{children}</ul>
+  ),
+  ol: ({ children }: { children?: React.ReactNode }) => (
+    <ol className="list-decimal list-inside space-y-1.5 mb-3 pl-2">{children}</ol>
+  ),
+  li: ({ children }: { children?: React.ReactNode }) => (
+    <li className="relative pl-4 before:content-['◆'] before:absolute before:left-0 before:text-star/60 before:text-xs">
+      {children}
+    </li>
+  ),
+  blockquote: ({ children }: { children?: React.ReactNode }) => (
+    <blockquote className="border-l-2 border-gold/40 pl-4 my-3 italic text-text-secondary">
+      {children}
+    </blockquote>
+  ),
+}
+
+/* ------------------------------------------------------------
    AI 解读面板组件
    ------------------------------------------------------------ */
 
@@ -42,9 +88,56 @@ export function AIInterpretation() {
   const { provider, providerSettings, enableThinking, enableWebSearch, searchApiKey } = useSettingsStore()
   const currentSettings = providerSettings[provider]
 
-  const [interpretation, setInterpretation] = useState('')
+  // 显示的文本（逐字输出）
+  const [displayText, setDisplayText] = useState('')
+  // 完整文本（缓冲区）
+  const fullTextRef = useRef('')
+  // 当前显示位置
+  const displayIndexRef = useRef(0)
+  // 定时器
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  // 是否正在接收（ref 用于定时器闭包）
+  const loadingRef = useRef(false)
   const [loading, setLoading] = useState(false)
+  // 是否正在输出动画
+  const [animating, setAnimating] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  /* ------------------------------------------------------------
+     均匀输出字符的定时器
+     ------------------------------------------------------------ */
+
+  const startAnimation = useCallback(() => {
+    if (timerRef.current) return
+
+    setAnimating(true)
+    timerRef.current = setInterval(() => {
+      if (displayIndexRef.current < fullTextRef.current.length) {
+        displayIndexRef.current++
+        setDisplayText(fullTextRef.current.slice(0, displayIndexRef.current))
+      } else if (!loadingRef.current) {
+        // 输出完成且不再加载
+        if (timerRef.current) {
+          clearInterval(timerRef.current)
+          timerRef.current = null
+        }
+        setAnimating(false)
+      }
+    }, CHAR_INTERVAL)
+  }, [])
+
+  // 组件卸载时清理定时器
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current)
+      }
+    }
+  }, [])
+
+  /* ------------------------------------------------------------
+     开始解读
+     ------------------------------------------------------------ */
 
   const handleInterpret = useCallback(async () => {
     if (!chart || !birthInfo) return
@@ -53,9 +146,19 @@ export function AIInterpretation() {
       return
     }
 
+    // 重置状态
+    loadingRef.current = true
     setLoading(true)
     setError(null)
-    setInterpretation('')
+    setDisplayText('')
+    fullTextRef.current = ''
+    displayIndexRef.current = 0
+
+    // 清理旧定时器
+    if (timerRef.current) {
+      clearInterval(timerRef.current)
+      timerRef.current = null
+    }
 
     try {
       // 提取知识上下文
@@ -89,57 +192,110 @@ ${contextStr}
         searchApiKey: searchApiKey || undefined,
       }
 
-      // 流式输出
-      let fullText = ''
+      // 启动均匀输出动画
+      startAnimation()
+
+      // 流式接收，写入缓冲区
       for await (const token of streamChat(config, messages)) {
-        fullText += token
-        setInterpretation(fullText)
+        fullTextRef.current += token
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : '解读失败，请重试')
     } finally {
+      loadingRef.current = false
       setLoading(false)
     }
-  }, [chart, birthInfo, provider, currentSettings, enableThinking, enableWebSearch, searchApiKey])
+  }, [chart, birthInfo, provider, currentSettings, enableThinking, enableWebSearch, searchApiKey, startAnimation])
 
   if (!chart) return null
 
   return (
-    <div className="glass p-6 h-full">
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-xl font-semibold text-amber">AI 命盘解读</h2>
+    <div
+      className="
+        relative p-6 lg:p-8
+        bg-gradient-to-br from-white/[0.04] to-transparent
+        backdrop-blur-xl border border-white/[0.08] rounded-2xl
+        shadow-[0_8px_32px_rgba(0,0,0,0.3)]
+      "
+    >
+      {/* 顶部发光线 */}
+      <div
+        className="
+          absolute top-0 left-1/2 -translate-x-1/2
+          w-1/3 h-px
+          bg-gradient-to-r from-transparent via-gold/50 to-transparent
+        "
+      />
+
+      {/* 头部 */}
+      <div className="flex items-center justify-between mb-6">
+        <h2
+          className="
+            text-xl lg:text-2xl font-semibold
+            bg-gradient-to-r from-gold via-gold-light to-gold
+            bg-clip-text text-transparent
+          "
+          style={{ fontFamily: 'var(--font-serif)' }}
+        >
+          AI 命盘解读
+        </h2>
         <Button
           onClick={handleInterpret}
           disabled={loading || !currentSettings.apiKey}
           size="sm"
+          variant="gold"
         >
-          {loading ? '解读中...' : currentSettings.apiKey ? '开始解读' : '请先配置 API'}
+          {loading ? (
+            <span className="flex items-center gap-2">
+              <span className="w-3 h-3 border-2 border-night border-t-transparent rounded-full animate-spin" />
+              解读中
+            </span>
+          ) : currentSettings.apiKey ? '开始解读' : '请先配置 API'}
         </Button>
       </div>
 
+      {/* 错误提示 */}
       {error && (
-        <div className="p-3 rounded-lg bg-misfortune/10 text-misfortune text-sm mb-4">
+        <div className="p-3 rounded-lg bg-misfortune/10 text-misfortune text-sm mb-4 border border-misfortune/20">
           {error}
         </div>
       )}
 
-      {!currentSettings.apiKey && !interpretation && (
-        <div className="text-text-muted text-sm">
+      {/* 未配置提示 */}
+      {!currentSettings.apiKey && !displayText && (
+        <div className="text-text-muted text-sm py-8 text-center">
+          <div className="text-3xl mb-3 opacity-30">☆</div>
           请先在设置中配置 AI 模型的 API Key，即可获得深度命盘解读。
         </div>
       )}
 
-      {interpretation && (
-        <div className="prose prose-invert max-w-none">
-          <div className="text-text-secondary whitespace-pre-wrap leading-relaxed">
-            {interpretation}
-          </div>
+      {/* 解读内容 - 书法字体 + Markdown 渲染 */}
+      {displayText && (
+        <div
+          className="
+            prose prose-invert max-w-none
+            text-text-secondary text-lg lg:text-xl leading-loose
+          "
+          style={{ fontFamily: 'var(--font-brush)' }}
+        >
+          <ReactMarkdown
+            remarkPlugins={[remarkGfm]}
+            components={MarkdownComponents}
+          >
+            {displayText}
+          </ReactMarkdown>
+
+          {/* 光标指示器 */}
+          {animating && (
+            <span className="inline-block w-0.5 h-5 bg-gold/80 animate-pulse ml-0.5 align-middle" />
+          )}
         </div>
       )}
 
-      {loading && !interpretation && (
-        <div className="flex items-center gap-2 text-text-muted">
-          <div className="w-4 h-4 border-2 border-star border-t-transparent rounded-full animate-spin" />
+      {/* 加载占位 */}
+      {loading && !displayText && (
+        <div className="flex items-center justify-center gap-3 text-text-muted py-12">
+          <div className="w-5 h-5 border-2 border-star border-t-transparent rounded-full animate-spin" />
           <span>正在分析命盘...</span>
         </div>
       )}

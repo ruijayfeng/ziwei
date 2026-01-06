@@ -1,8 +1,10 @@
 /* ============================================================
    命盘可视化组件
    紫微斗数命盘为 4x4 方格，中间为命主信息，周围十二宫
+   Bento Grid 风格 + 悬浮交互 + 星光效果
    ============================================================ */
 
+import { useState } from 'react'
 import { useChartStore } from '@/stores'
 import type { FunctionalAstrolabe } from '@/lib/astro'
 
@@ -44,7 +46,42 @@ interface PalaceData {
 }
 
 /* ------------------------------------------------------------
-   宫位卡片组件
+   星曜标签组件 - 带四化高亮
+   ------------------------------------------------------------ */
+
+interface StarTagProps {
+  star: string
+}
+
+function StarTag({ star }: StarTagProps) {
+  const hasLu = star.includes('化禄')
+  const hasQuan = star.includes('化权')
+  const hasKe = star.includes('化科')
+  const hasJi = star.includes('化忌')
+  const hasMutagen = hasLu || hasQuan || hasKe || hasJi
+
+  return (
+    <span
+      className={`
+        inline-flex items-center gap-0.5 text-xs px-1.5 py-0.5 rounded
+        transition-all duration-200
+        ${hasLu ? 'bg-gradient-to-r from-fortune/20 to-fortune/10 text-fortune font-medium' : ''}
+        ${hasQuan ? 'bg-gradient-to-r from-gold/20 to-gold/10 text-gold font-medium' : ''}
+        ${hasKe ? 'bg-gradient-to-r from-star/20 to-star/10 text-star-light font-medium' : ''}
+        ${hasJi ? 'bg-gradient-to-r from-misfortune/20 to-misfortune/10 text-misfortune font-medium' : ''}
+        ${!hasMutagen ? 'bg-white/5 text-text-secondary hover:bg-white/10' : ''}
+      `}
+    >
+      {star}
+      {hasMutagen && (
+        <span className="w-1 h-1 rounded-full bg-current opacity-60 animate-pulse" />
+      )}
+    </span>
+  )
+}
+
+/* ------------------------------------------------------------
+   宫位卡片组件 - Bento 风格
    ------------------------------------------------------------ */
 
 interface PalaceCardProps {
@@ -53,58 +90,78 @@ interface PalaceCardProps {
   stars: string[]
   isLife?: boolean
   isBody?: boolean
+  isSelected?: boolean
+  onClick?: () => void
 }
 
-function PalaceCard({ name, branch, stars, isLife, isBody }: PalaceCardProps) {
+function PalaceCard({ name, branch, stars, isLife, isBody, isSelected, onClick }: PalaceCardProps) {
   return (
     <div
+      onClick={onClick}
       className={`
-        glass p-2 h-full min-h-[120px] flex flex-col
-        ${isLife ? 'ring-2 ring-amber' : ''}
-        ${isBody ? 'ring-2 ring-star' : ''}
+        group relative p-3 lg:p-4 h-full min-h-[100px] lg:min-h-[140px] flex flex-col
+        bg-white/[0.03] backdrop-blur-sm
+        border border-white/[0.06] rounded-xl
+        transition-all duration-300 cursor-pointer
+        hover:bg-white/[0.06] hover:border-white/[0.12]
+        hover:shadow-[0_0_30px_rgba(124,58,237,0.1)]
+        ${isLife ? 'ring-1 ring-gold/50 bg-gold/[0.03]' : ''}
+        ${isBody ? 'ring-1 ring-star/50 bg-star/[0.03]' : ''}
+        ${isSelected ? 'ring-2 ring-star shadow-[0_0_40px_rgba(124,58,237,0.2)]' : ''}
       `}
     >
-      {/* 宫位名称 */}
-      <div className="flex items-center justify-between mb-1">
-        <span className="text-xs text-text-muted">{branch}</span>
+      {/* 角落发光点 - 命宫/身宫 */}
+      {(isLife || isBody) && (
+        <div
+          className={`
+            absolute -top-1 -right-1 w-2 h-2 rounded-full
+            ${isLife ? 'bg-gold shadow-[0_0_8px_rgba(212,175,55,0.6)]' : ''}
+            ${isBody ? 'bg-star-light shadow-[0_0_8px_rgba(167,139,250,0.6)]' : ''}
+            animate-pulse
+          `}
+        />
+      )}
+
+      {/* 宫位头部 */}
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-[10px] text-text-muted font-mono">{branch}</span>
         <span
           className={`
-            text-xs px-1.5 py-0.5 rounded
-            ${isLife ? 'bg-amber/20 text-amber' : ''}
+            text-xs px-1.5 py-0.5 rounded font-medium
+            transition-colors duration-200
+            ${isLife ? 'bg-gold/20 text-gold' : ''}
             ${isBody ? 'bg-star/20 text-star-light' : ''}
-            ${!isLife && !isBody ? 'text-text-secondary' : ''}
+            ${!isLife && !isBody ? 'text-text-secondary group-hover:text-text' : ''}
           `}
         >
           {name}
-          {isLife && ' ★'}
-          {isBody && ' ◎'}
         </span>
       </div>
 
       {/* 星曜列表 */}
       <div className="flex-1 flex flex-wrap gap-1 content-start">
         {stars.map((star, index) => (
-          <span
-            key={index}
-            className={`
-              text-xs px-1.5 py-0.5 rounded
-              ${star.includes('化禄') ? 'bg-fortune/20 text-fortune' : ''}
-              ${star.includes('化权') ? 'bg-amber/20 text-amber' : ''}
-              ${star.includes('化科') ? 'bg-star/20 text-star-light' : ''}
-              ${star.includes('化忌') ? 'bg-misfortune/20 text-misfortune' : ''}
-              ${!star.includes('化') ? 'bg-white/5 text-text-secondary' : ''}
-            `}
-          >
-            {star}
-          </span>
+          <StarTag key={index} star={star} />
         ))}
       </div>
+
+      {/* 悬浮指示线 */}
+      <div
+        className={`
+          absolute bottom-0 left-1/2 -translate-x-1/2
+          w-0 h-0.5 rounded-full
+          bg-gradient-to-r from-star via-gold to-star
+          transition-all duration-300
+          group-hover:w-3/4
+          ${isSelected ? 'w-3/4' : ''}
+        `}
+      />
     </div>
   )
 }
 
 /* ------------------------------------------------------------
-   中央信息区域
+   中央信息区域 - 高级卡片风格
    ------------------------------------------------------------ */
 
 interface CenterInfoProps {
@@ -116,13 +173,59 @@ interface CenterInfoProps {
 
 function CenterInfo({ solarDate, lunarDate, gender, fiveElement }: CenterInfoProps) {
   return (
-    <div className="glass p-4 flex flex-col items-center justify-center h-full">
-      <h3 className="text-lg font-semibold text-amber mb-2">命盘信息</h3>
-      <div className="text-sm text-text-secondary space-y-1 text-center">
-        <p>阳历：{solarDate}</p>
-        <p>农历：{lunarDate}</p>
-        <p>性别：{gender}</p>
-        <p className="text-star-light font-medium">{fiveElement}</p>
+    <div
+      className="
+        relative h-full min-h-[220px] lg:min-h-[300px] p-4 lg:p-6
+        flex flex-col items-center justify-center
+        bg-gradient-to-br from-white/[0.04] to-white/[0.02]
+        backdrop-blur-md border border-white/[0.08] rounded-xl
+        overflow-hidden
+      "
+    >
+      {/* 背景装饰 - 太极图案暗纹 */}
+      <div className="absolute inset-0 opacity-[0.02]">
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-32 h-32 rounded-full border-2 border-white" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-24 h-24 rounded-full border border-white" />
+      </div>
+
+      {/* 标题 */}
+      <h3
+        className="
+          relative text-xl lg:text-2xl font-semibold mb-4
+          bg-gradient-to-r from-gold via-gold-light to-gold
+          bg-clip-text text-transparent
+        "
+        style={{ fontFamily: 'var(--font-serif)' }}
+      >
+        命盘信息
+      </h3>
+
+      {/* 信息列表 */}
+      <div className="relative text-sm lg:text-base text-text-secondary space-y-2 text-center">
+        <p className="flex items-center justify-center gap-2">
+          <span className="text-text-muted">阳历</span>
+          <span className="text-text">{solarDate}</span>
+        </p>
+        <p className="flex items-center justify-center gap-2">
+          <span className="text-text-muted">农历</span>
+          <span className="text-text">{lunarDate}</span>
+        </p>
+        <p className="flex items-center justify-center gap-2">
+          <span className="text-text-muted">性别</span>
+          <span className="text-text">{gender}</span>
+        </p>
+        <div className="pt-2">
+          <span
+            className="
+              inline-block px-3 py-1 rounded-full
+              bg-gradient-to-r from-star/20 to-gold/20
+              text-star-light font-medium
+              border border-star/20
+            "
+          >
+            {fiveElement}
+          </span>
+        </div>
       </div>
     </div>
   )
@@ -162,6 +265,7 @@ function parsePalaces(chart: FunctionalAstrolabe): PalaceData[] {
 
 export function ChartDisplay() {
   const { chart, birthInfo } = useChartStore()
+  const [selectedPalace, setSelectedPalace] = useState<string | null>(null)
 
   if (!chart || !birthInfo) {
     return null
@@ -192,17 +296,53 @@ export function ChartDisplay() {
   const fiveElement = chart.fiveElementsClass || '---'
 
   return (
-    <div className="glass p-4 lg:p-6">
-      <div className="grid grid-cols-4 gap-2">
+    <div
+      className="
+        relative p-4 lg:p-8
+        bg-gradient-to-br from-white/[0.04] to-transparent
+        backdrop-blur-xl border border-white/[0.08] rounded-2xl
+        shadow-[0_8px_32px_rgba(0,0,0,0.3)]
+        max-w-5xl mx-auto
+      "
+    >
+      {/* 顶部发光线条 */}
+      <div
+        className="
+          absolute top-0 left-1/2 -translate-x-1/2
+          w-1/3 h-px
+          bg-gradient-to-r from-transparent via-star/50 to-transparent
+        "
+      />
+
+      {/* 命盘网格 */}
+      <div className="grid grid-cols-4 gap-2 lg:gap-3">
         {/* 第一行 */}
         {grid[0].map((palace, col) => (
           <div key={`0-${col}`}>
-            {palace && <PalaceCard {...palace} />}
+            {palace && (
+              <PalaceCard
+                {...palace}
+                isSelected={selectedPalace === palace.name}
+                onClick={() => setSelectedPalace(
+                  selectedPalace === palace.name ? null : palace.name
+                )}
+              />
+            )}
           </div>
         ))}
 
         {/* 第二行（左 + 中间 + 右） */}
-        <div>{grid[1][0] && <PalaceCard {...grid[1][0]} />}</div>
+        <div>
+          {grid[1][0] && (
+            <PalaceCard
+              {...grid[1][0]}
+              isSelected={selectedPalace === grid[1][0].name}
+              onClick={() => setSelectedPalace(
+                selectedPalace === grid[1][0]!.name ? null : grid[1][0]!.name
+              )}
+            />
+          )}
+        </div>
         <div className="col-span-2 row-span-2">
           <CenterInfo
             solarDate={solarDate}
@@ -211,18 +351,76 @@ export function ChartDisplay() {
             fiveElement={fiveElement}
           />
         </div>
-        <div>{grid[1][3] && <PalaceCard {...grid[1][3]} />}</div>
+        <div>
+          {grid[1][3] && (
+            <PalaceCard
+              {...grid[1][3]}
+              isSelected={selectedPalace === grid[1][3].name}
+              onClick={() => setSelectedPalace(
+                selectedPalace === grid[1][3]!.name ? null : grid[1][3]!.name
+              )}
+            />
+          )}
+        </div>
 
         {/* 第三行（左 + 右） */}
-        <div>{grid[2][0] && <PalaceCard {...grid[2][0]} />}</div>
-        <div>{grid[2][3] && <PalaceCard {...grid[2][3]} />}</div>
+        <div>
+          {grid[2][0] && (
+            <PalaceCard
+              {...grid[2][0]}
+              isSelected={selectedPalace === grid[2][0].name}
+              onClick={() => setSelectedPalace(
+                selectedPalace === grid[2][0]!.name ? null : grid[2][0]!.name
+              )}
+            />
+          )}
+        </div>
+        <div>
+          {grid[2][3] && (
+            <PalaceCard
+              {...grid[2][3]}
+              isSelected={selectedPalace === grid[2][3].name}
+              onClick={() => setSelectedPalace(
+                selectedPalace === grid[2][3]!.name ? null : grid[2][3]!.name
+              )}
+            />
+          )}
+        </div>
 
         {/* 第四行 */}
         {grid[3].map((palace, col) => (
           <div key={`3-${col}`}>
-            {palace && <PalaceCard {...palace} />}
+            {palace && (
+              <PalaceCard
+                {...palace}
+                isSelected={selectedPalace === palace.name}
+                onClick={() => setSelectedPalace(
+                  selectedPalace === palace.name ? null : palace.name
+                )}
+              />
+            )}
           </div>
         ))}
+      </div>
+
+      {/* 图例 */}
+      <div className="flex items-center justify-center gap-6 mt-4 pt-4 border-t border-white/[0.06]">
+        <div className="flex items-center gap-1.5">
+          <div className="w-2 h-2 rounded-full bg-gold shadow-[0_0_6px_rgba(212,175,55,0.5)]" />
+          <span className="text-xs text-text-muted">命宫</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <div className="w-2 h-2 rounded-full bg-star-light shadow-[0_0_6px_rgba(167,139,250,0.5)]" />
+          <span className="text-xs text-text-muted">身宫</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <div className="w-1.5 h-1.5 rounded-full bg-fortune" />
+          <span className="text-xs text-text-muted">化禄</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <div className="w-1.5 h-1.5 rounded-full bg-misfortune" />
+          <span className="text-xs text-text-muted">化忌</span>
+        </div>
       </div>
     </div>
   )
