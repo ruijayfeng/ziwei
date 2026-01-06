@@ -5,11 +5,48 @@
 ## 当前状态
 
 ```
-[文墨天机标准对齐] 2026-01-06
-安星法改中州派 + 子初换日 + 命盘显示全面扩展
+[人生 K 线] 2026-01-06
+运势量化可视化 + ECharts K 线图 + LLM 事件描述
 ```
 
 ## 变更日志
+
+### 2026-01-06 人生 K 线功能
+
+**核心功能**
+- 运势评分引擎：星曜基础分 × 亮度系数 + 四化修正
+- 三种时间维度：大限(10年) / 三年 / 月度
+- K 线可视化：ECharts Candlestick + 趋势线
+- 四维度雷达图：事业/财运/感情/健康
+
+**评分算法 (fortune-score.ts)**
+```
+总分 = Σ(星曜基础分 × 亮度系数) + 四化修正
+- 紫微+18, 天府+16, 六吉+9~11, 六煞-8~12
+- 亮度: 庙×1.5, 旺×1.3, 平×0.9, 陷×0.5
+- 四化: 禄+15, 权+12, 科+10, 忌-18
+```
+
+**K 线数据结构**
+```typescript
+interface KLineData {
+  period: string      // "6-15" 或 "2025"
+  type: 'decadal' | 'yearly' | 'monthly'
+  open, high, low, close: number
+  score: FortuneScore
+  events: EventData[]
+}
+```
+
+**事件卡片**
+- 涨：金色闪光 + 上升箭头
+- 跌：紫红脉冲 + 警示风格
+- 悬停触发 LLM 生成事件描述
+
+**技术栈**
+- 图表：echarts + echarts-for-react
+- 组件：LifeKLine / EventCard / ScoreRadar
+- 位置：Tab 顺序「年度运势」后「双人合盘」前
 
 ### 2026-01-06 文墨天机标准对齐
 
@@ -140,6 +177,7 @@ setInterval(() => {
 | P3 | ✅ | `0de45af` | 年度运势 + 双人合盘 |
 | P4 | ✅ | `9eea111` | 分享卡片 + UI 打磨 |
 | P5 | ✅ | `e4c203e` | UI 全面升级 + AI 解读优化 |
+| P6 | ✅ | - | 人生 K 线 + 运势评分引擎 |
 
 ## 架构地图
 
@@ -157,6 +195,7 @@ zwds/
 │   │   │   ├── ui/           # Button/Input/Select
 │   │   │   ├── chart/        # ChartDisplay (Bento Grid)
 │   │   │   ├── fortune/      # YearlyFortune
+│   │   │   ├── kline/        # 🆕 LifeKLine/EventCard/ScoreRadar
 │   │   │   ├── match/        # MatchAnalysis
 │   │   │   ├── share/        # ShareCard
 │   │   │   ├── BirthForm.tsx # 生辰表单 (玻璃态)
@@ -164,12 +203,13 @@ zwds/
 │   │   │   └── SettingsPanel.tsx
 │   │   ├── lib/
 │   │   │   ├── astro.ts      # iztro 排盘封装
-│   │   │   └── llm.ts        # 多模型适配层
+│   │   │   ├── llm.ts        # 多模型适配层
+│   │   │   └── fortune-score.ts # 🆕 运势评分引擎
 │   │   ├── knowledge/         # 结构化知识库
 │   │   ├── stores/           # Zustand 状态管理
-│   │   ├── App.tsx           # 主入口（上下布局）
+│   │   ├── App.tsx           # 主入口（5 Tab）
 │   │   └── index.css         # 全局样式 (Aurora + Glass)
-│   └── package.json          # +react-markdown, remark-gfm
+│   └── package.json          # +echarts, echarts-for-react
 └── docs/plans/
 ```
 
@@ -179,8 +219,10 @@ zwds/
 |------|------|----------|
 | `lib/astro.ts` | iztro 排盘封装 | `generateChart(birthInfo)` |
 | `lib/llm.ts` | 多模型适配层 | `streamChat(messages, config)` |
+| `lib/fortune-score.ts` | 运势评分引擎 | `calculatePeriodScore()`, `generate*KLines()` |
 | `knowledge/` | 结构化 RAG | `extractKnowledge(chart)` |
 | `components/chart/` | 命盘可视化 | Bento Grid 4x4 布局 |
+| `components/kline/` | 人生 K 线 | ECharts K 线 + 雷达图 + 事件卡片 |
 | `components/AIInterpretation` | AI 解读 | 丝滑输出 + Markdown |
 | `stores/` | 全局状态 | chart, birthInfo, settings |
 

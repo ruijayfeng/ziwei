@@ -176,8 +176,8 @@ export function MatchAnalysis() {
       const chart2 = generateChart(person2)
 
       // 提取知识上下文
-      const knowledge1 = extractKnowledge(chart1)
-      const knowledge2 = extractKnowledge(chart2)
+      const knowledge1 = extractKnowledge(chart1, person1.year)
+      const knowledge2 = extractKnowledge(chart2, person2.year)
       const context1 = buildPromptContext(knowledge1)
       const context2 = buildPromptContext(knowledge2)
 

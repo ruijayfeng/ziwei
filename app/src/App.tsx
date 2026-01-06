@@ -9,15 +9,17 @@ import { ChartDisplay } from '@/components/chart'
 import { AIInterpretation } from '@/components/AIInterpretation'
 import { SettingsPanel } from '@/components/SettingsPanel'
 import { YearlyFortune } from '@/components/fortune'
+import { LifeKLine } from '@/components/kline'
 import { MatchAnalysis } from '@/components/match'
 import { ShareCard } from '@/components/share'
 import { useChartStore } from '@/stores'
 
-type TabType = 'chart' | 'fortune' | 'match' | 'share'
+type TabType = 'chart' | 'fortune' | 'kline' | 'match' | 'share'
 
 const TABS: Array<{ key: TabType; label: string; icon: string }> = [
   { key: 'chart', label: '命盘解读', icon: '☰' },
   { key: 'fortune', label: '年度运势', icon: '◎' },
+  { key: 'kline', label: '人生K线', icon: '📈' },
   { key: 'match', label: '双人合盘', icon: '⚭' },
   { key: 'share', label: '分享卡片', icon: '◈' },
 ]
@@ -252,6 +254,21 @@ export default function App() {
               </div>
             ) : (
               <YearlyFortune />
+            )
+          )}
+
+          {/* 人生K线标签 */}
+          {activeTab === 'kline' && (
+            !chart ? (
+              <div className="flex items-center justify-center min-h-[60vh]">
+                <EmptyState
+                  message="请先在「命盘解读」中输入您的生辰信息"
+                  action={() => setActiveTab('chart')}
+                  actionLabel="前往输入"
+                />
+              </div>
+            ) : (
+              <LifeKLine />
             )
           )}
 

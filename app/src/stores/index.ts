@@ -6,6 +6,7 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { FunctionalAstrolabe } from '@/lib/astro'
 import type { BirthInfo } from '@/lib/astro'
+import type { KLineData } from '@/lib/fortune-score'
 
 /* ------------------------------------------------------------
    命盘状态
@@ -24,7 +25,66 @@ export const useChartStore = create<ChartState>()((set) => ({
   chart: null,
   setBirthInfo: (info) => set({ birthInfo: info }),
   setChart: (chart) => set({ chart }),
-  clear: () => set({ birthInfo: null, chart: null }),
+  clear: () => {
+    set({ birthInfo: null, chart: null })
+    // 同时清除内容缓存
+    useContentCacheStore.getState().clearAll()
+  },
+}))
+
+/* ------------------------------------------------------------
+   内容缓存状态 (AI解读、K线等)
+   ------------------------------------------------------------ */
+
+interface KLineCache {
+  decadal: KLineData[]
+  yearly: KLineData[]
+  monthly: Record<number, KLineData[]>
+}
+
+interface ContentCacheState {
+  // AI 命盘解读
+  aiInterpretation: string | null
+  setAiInterpretation: (content: string) => void
+
+  // 年度运势解读 (按年份缓存)
+  yearlyFortune: Record<number, string>
+  setYearlyFortune: (year: number, content: string) => void
+
+  // K 线数据
+  klineCache: KLineCache | null
+  klineEvents: Record<string, string>  // 事件描述缓存
+  setKlineCache: (cache: KLineCache) => void
+  setKlineEvent: (key: string, description: string) => void
+
+  // 清除所有缓存
+  clearAll: () => void
+}
+
+export const useContentCacheStore = create<ContentCacheState>()((set) => ({
+  aiInterpretation: null,
+  yearlyFortune: {},
+  klineCache: null,
+  klineEvents: {},
+
+  setAiInterpretation: (content) => set({ aiInterpretation: content }),
+
+  setYearlyFortune: (year, content) => set((state) => ({
+    yearlyFortune: { ...state.yearlyFortune, [year]: content },
+  })),
+
+  setKlineCache: (cache) => set({ klineCache: cache }),
+
+  setKlineEvent: (key, description) => set((state) => ({
+    klineEvents: { ...state.klineEvents, [key]: description },
+  })),
+
+  clearAll: () => set({
+    aiInterpretation: null,
+    yearlyFortune: {},
+    klineCache: null,
+    klineEvents: {},
+  }),
 }))
 
 /* ------------------------------------------------------------

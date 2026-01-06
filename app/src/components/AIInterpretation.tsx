@@ -6,7 +6,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { useChartStore, useSettingsStore } from '@/stores'
+import { useChartStore, useSettingsStore, useContentCacheStore } from '@/stores'
 import { extractKnowledge, buildPromptContext } from '@/knowledge'
 import { streamChat, type ChatMessage, type LLMConfig } from '@/lib/llm'
 import { Button } from '@/components/ui'
@@ -86,6 +86,7 @@ const MarkdownComponents = {
 export function AIInterpretation() {
   const { chart, birthInfo } = useChartStore()
   const { provider, providerSettings, enableThinking, enableWebSearch, searchApiKey } = useSettingsStore()
+  const { aiInterpretation, setAiInterpretation } = useContentCacheStore()
   const currentSettings = providerSettings[provider]
 
   // 显示的文本（逐字输出）
@@ -102,6 +103,15 @@ export function AIInterpretation() {
   // 是否正在输出动画
   const [animating, setAnimating] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  // 组件挂载时，如果有缓存则直接显示
+  useEffect(() => {
+    if (aiInterpretation && !displayText) {
+      setDisplayText(aiInterpretation)
+      fullTextRef.current = aiInterpretation
+      displayIndexRef.current = aiInterpretation.length
+    }
+  }, [aiInterpretation, displayText])
 
   /* ------------------------------------------------------------
      均匀输出字符的定时器
@@ -162,7 +172,7 @@ export function AIInterpretation() {
 
     try {
       // 提取知识上下文
-      const knowledge = extractKnowledge(chart)
+      const knowledge = extractKnowledge(chart, birthInfo.year)
       const contextStr = buildPromptContext(knowledge)
 
       // 构建用户消息
@@ -199,13 +209,16 @@ ${contextStr}
       for await (const token of streamChat(config, messages)) {
         fullTextRef.current += token
       }
+
+      // 保存到全局缓存
+      setAiInterpretation(fullTextRef.current)
     } catch (err) {
       setError(err instanceof Error ? err.message : '解读失败，请重试')
     } finally {
       loadingRef.current = false
       setLoading(false)
     }
-  }, [chart, birthInfo, provider, currentSettings, enableThinking, enableWebSearch, searchApiKey, startAnimation])
+  }, [chart, birthInfo, provider, currentSettings, enableThinking, enableWebSearch, searchApiKey, startAnimation, setAiInterpretation])
 
   if (!chart) return null
 

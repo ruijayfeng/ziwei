@@ -6,6 +6,7 @@
 import { useState, useCallback } from 'react'
 import { useChartStore, useSettingsStore } from '@/stores'
 import { streamChat, type ChatMessage, type LLMConfig } from '@/lib/llm'
+import { extractKnowledge, buildPromptContext } from '@/knowledge'
 import { Button, Select } from '@/components/ui'
 
 /* ------------------------------------------------------------
@@ -41,6 +42,74 @@ const FORTUNE_PROMPT = `你是一位精通紫微斗数的命理师。现在需�
 7. **开运建议**：具体可执行的建议`
 
 /* ------------------------------------------------------------
+   构建流年盘详细信息
+   ------------------------------------------------------------ */
+
+interface HoroscopeData {
+  heavenlyStem: string
+  earthlyBranch: string
+  mutagen: string[]
+  index: number
+  palaceNames: string[]
+}
+
+function buildYearlyContext(
+  chart: { palaces: Array<{ name: unknown; majorStars: Array<{ name: unknown; brightness?: unknown; mutagen?: unknown }>; minorStars: Array<{ name: unknown; mutagen?: unknown }> }> },
+  horoscope: { yearly: HoroscopeData; decadal: HoroscopeData },
+  year: number
+): string {
+  const lines: string[] = []
+  const yearly = horoscope.yearly
+  const decadal = horoscope.decadal
+
+  lines.push('【流年盘信息】')
+  lines.push('')
+
+  // 流年基础信息
+  lines.push('## 流年基础')
+  lines.push(`- 流年：${year}年（${yearly.heavenlyStem}${yearly.earthlyBranch}年）`)
+  lines.push(`- 流年四化：${yearly.mutagen.join('、')}`)
+  lines.push(`- 流年命宫位置：${yearly.palaceNames[0]}`)
+  lines.push('')
+
+  // 大限信息
+  lines.push('## 当前大限')
+  lines.push(`- 大限天干：${decadal.heavenlyStem}`)
+  lines.push(`- 大限四化：${decadal.mutagen.join('、')}`)
+  lines.push(`- 大限命宫位置：${decadal.palaceNames[0]}`)
+  lines.push('')
+
+  // 流年各宫分析（重点宫位）
+  lines.push('## 流年重点宫位星曜')
+  const importantPalaces = ['命宫', '财帛宫', '官禄宫', '夫妻宫', '疾厄宫', '迁移宫']
+
+  for (const palaceName of importantPalaces) {
+    const palace = chart.palaces.find(p => String(p.name) === palaceName)
+    if (!palace) continue
+
+    const majorStarsStr = palace.majorStars.map(s => {
+      let str = String(s.name)
+      if (s.brightness) str += `(${s.brightness})`
+      if (s.mutagen) str += `[${s.mutagen}]`
+      return str
+    }).join('、') || '无主星'
+
+    const minorStarsStr = palace.minorStars.map(s => {
+      let str = String(s.name)
+      if (s.mutagen) str += `[${s.mutagen}]`
+      return str
+    }).join('、')
+
+    lines.push(`### ${palaceName}`)
+    lines.push(`- 主星：${majorStarsStr}`)
+    if (minorStarsStr) lines.push(`- 辅星：${minorStarsStr}`)
+    lines.push('')
+  }
+
+  return lines.join('\n')
+}
+
+/* ------------------------------------------------------------
    年度运势组件
    ------------------------------------------------------------ */
 
@@ -68,15 +137,13 @@ export function YearlyFortune() {
     try {
       // 获取流年运限数据
       const horoscope = chart.horoscope(new Date(`${year}-6-15`))
-      const yearly = horoscope.yearly
 
-      // 提取流年信息
-      const yearlyInfo = [
-        `流年天干：${yearly.heavenlyStem}`,
-        `流年地支：${yearly.earthlyBranch}`,
-        `流年四化：${yearly.mutagen.join('、')}`,
-        `流年命宫：${yearly.palaceNames[0]}`,
-      ].join('\n')
+      // 提取本命盘完整信息
+      const knowledge = extractKnowledge(chart, birthInfo.year)
+      const natalContext = buildPromptContext(knowledge)
+
+      // 构建流年盘信息
+      const yearlyContext = buildYearlyContext(chart, horoscope, year)
 
       const userMessage = `请分析以下命盘的 ${year} 年运势：
 
@@ -86,10 +153,11 @@ export function YearlyFortune() {
 - 五行局：${chart.fiveElementsClass}
 - 分析年份：${year}年
 
-## 流年盘信息
-${yearlyInfo}
+${natalContext}
 
-请给出详细的年度运势分析。`
+${yearlyContext}
+
+请结合本命盘和流年盘信息，给出详细的 ${year} 年运势分析。`
 
       const messages: ChatMessage[] = [
         { role: 'system', content: FORTUNE_PROMPT },
