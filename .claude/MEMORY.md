@@ -5,12 +5,34 @@
 ## 当前状态
 
 ```
-[UI 全面升级 + AI 解读优化] 2026-01-06
-Dark Mode + Glassmorphism + Aurora UI + 书法字体
-高端命理产品设计语言 + 丝滑流式输出
+[文墨天机标准对齐] 2026-01-06
+安星法改中州派 + 子初换日 + 命盘显示全面扩展
 ```
 
 ## 变更日志
+
+### 2026-01-06 文墨天机标准对齐
+
+**配置调整 (astro.ts)**
+- 安星法: `default` → `zhongzhou` (中州派)
+- 子初换日: 23:00 即换日 (`dayDivide: forward`)
+- 时辰映射修正: hour=23 → timeIndex=12 (晚子时)
+
+**命盘显示扩展 (ChartDisplay.tsx)**
+- 宫干显示: `stem` + `branch` (如 "戊寅")
+- 大限范围: `decadal.range` (如 "26-35")
+- 命主/身主: `chart.soul` / `chart.body`
+- 纳音五行: 六十甲子纳音表查询
+- 生肖/星座: `chart.zodiac` / `chart.sign`
+
+**星曜显示**
+- 完整辅星: 不再 `slice(0, 4)`
+- 亮度显示: 庙旺得利平不陷
+- 杂曜: `adjectiveStars` 完整显示
+
+**十二神系**
+- 长生十二神: `changsheng12`
+- 博士十二神: `boshi12`
 
 ### 2026-01-06 AI 解读体验优化
 
