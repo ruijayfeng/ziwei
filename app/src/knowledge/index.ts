@@ -4,7 +4,6 @@
    ============================================================ */
 
 import { getStarInfo, type StarInfo } from './stars/majorStars'
-import { getPalaceInfo, type PalaceInfo } from './palaces'
 import { getSihuaInfo, type SihuaInfo } from './sihua'
 import type FunctionalAstrolabe from 'iztro/lib/astro/FunctionalAstrolabe'
 

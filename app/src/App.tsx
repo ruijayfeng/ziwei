@@ -217,7 +217,7 @@ export default function App() {
                 </div>
 
                 {/* AI 解读 - 下方展示，与命盘等宽 */}
-                <div className="w-full max-w-5xl mx-auto">
+                <div className="w-full max-w-6xl mx-auto">
                   <AIInterpretation />
                 </div>
 

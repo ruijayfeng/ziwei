@@ -4,6 +4,8 @@
    ============================================================ */
 
 import { useState, useCallback } from 'react'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import { useSettingsStore } from '@/stores'
 import { generateChart, type BirthInfo, type Gender } from '@/lib/astro'
 import { extractKnowledge, buildPromptContext } from '@/knowledge'
@@ -50,24 +52,81 @@ const GENDER_OPTIONS = [
    合盘提示词
    ------------------------------------------------------------ */
 
-const MATCH_PROMPT = `你是一位精通紫微斗数的命理师。现在需要分析两人的命盘契合度。
+const MATCH_PROMPT = `# Role
+你是一位擅长推演人际姻缘的紫微斗数专家。根据提供的命盘信息进行解读。在合盘分析中，你不仅观察表面的星情互补，更注重通过"飞星四化"来推演两人深层的缘分羁绊与利弊关系。
 
-## 分析原则：
-1. 对比双方命宫主星的相性
-2. 分析双方夫妻宫的匹配度
-3. 观察双方四化是否互补
-4. 找出相处中可能的问题点
-5. 给出相处建议
+# Analysis Logic
+1.  **星情对看**：分析两人命宫主星的性质是否匹配（如：强弱搭配、动静结合）。
+2.  **四化互飞**：推演A的命宫四化飞入B的宫位，判断A对B是生助（化禄）还是刑克（化忌），反之亦然。
+3.  **宫位参合**：观察双方夫妻宫的意象是否与对方吻合。
 
-## 解读结构：
-1. **整体契合度**：用百分比和简短描述概括
-2. **性格匹配**：双方性格的互补与冲突
-3. **感情模式**：双方对感情的态度
-4. **相处优势**：在一起的好处
-5. **潜在挑战**：可能遇到的问题
-6. **相处建议**：具体的相处之道
+# Output Format
+请严格按照以下结构输出分析报告：
 
-语言温暖真诚，既指出问题也给予希望。`
+## 双人命盘合参解析
+
+### 壹· 缘分深浅
+* **契合综述**：不使用分数，而是用定性描述（如：天作之合、欢喜冤家、因缘波折、相辅相成）。
+* **关系本质**：从命理角度解析，两人相遇是互相成就，还是互相偿还宿债。
+
+### 贰· 性情互动
+* **相合之处**：两人性格中能够产生共鸣或互补的地方。
+* **磨合难点**：两人性格中容易产生摩擦或误解的本质原因（如：一方重情，一方重利）。
+
+### 叁· 命理羁绊（四化互飞）
+* **助益分析**：分析两人在一起，谁能旺谁？（如：对方是否有助于你的事业或财运）。
+* **隐忧所在**：命理上是否存在互相刑克或拖累的情况？
+
+### 肆· 现实展望
+* **未来挑战**：若长期相处或步入婚姻，最需要共同面对的现实考验是什么？
+* **相处建议**：针对两人的命局特点，给出具体的相处之道与沟通建议。
+
+---
+*注：缘分天定，份在人为。合盘分析旨在增进了解，非绝对定论。*`
+
+/* ------------------------------------------------------------
+   Markdown 自定义样式组件
+   ------------------------------------------------------------ */
+
+const MarkdownComponents = {
+  h1: ({ children }: { children?: React.ReactNode }) => (
+    <h1 className="text-2xl font-bold text-gold mt-6 mb-3 first:mt-0">{children}</h1>
+  ),
+  h2: ({ children }: { children?: React.ReactNode }) => (
+    <h2 className="text-xl font-semibold text-gold/90 mt-5 mb-2">{children}</h2>
+  ),
+  h3: ({ children }: { children?: React.ReactNode }) => (
+    <h3 className="text-lg font-medium text-star-light mt-4 mb-2">{children}</h3>
+  ),
+  p: ({ children }: { children?: React.ReactNode }) => (
+    <p className="mb-3 leading-relaxed">{children}</p>
+  ),
+  strong: ({ children }: { children?: React.ReactNode }) => (
+    <strong className="text-gold font-semibold">{children}</strong>
+  ),
+  ul: ({ children }: { children?: React.ReactNode }) => (
+    <ul className="list-none space-y-1.5 mb-3 pl-4">{children}</ul>
+  ),
+  ol: ({ children }: { children?: React.ReactNode }) => (
+    <ol className="list-decimal list-inside space-y-1.5 mb-3 pl-2">{children}</ol>
+  ),
+  li: ({ children }: { children?: React.ReactNode }) => (
+    <li className="relative pl-4 before:content-['◆'] before:absolute before:left-0 before:text-star/60 before:text-xs">
+      {children}
+    </li>
+  ),
+  blockquote: ({ children }: { children?: React.ReactNode }) => (
+    <blockquote className="border-l-2 border-gold/40 pl-4 my-3 italic text-text-secondary">
+      {children}
+    </blockquote>
+  ),
+  hr: () => (
+    <hr className="my-6 border-0 h-px bg-gradient-to-r from-transparent via-gold/30 to-transparent" />
+  ),
+  em: ({ children }: { children?: React.ReactNode }) => (
+    <em className="text-text-muted not-italic">{children}</em>
+  ),
+}
 
 /* ------------------------------------------------------------
    个人信息输入组件
@@ -85,8 +144,20 @@ function PersonInput({ label, value, onChange }: PersonInputProps) {
   }
 
   return (
-    <div className="glass p-4 flex-1">
-      <h3 className="text-lg font-medium text-star-light mb-3">{label}</h3>
+    <div
+      className="
+        relative p-5
+        bg-gradient-to-br from-white/[0.04] to-transparent
+        backdrop-blur-xl border border-white/[0.08] rounded-xl
+        shadow-[0_4px_20px_rgba(0,0,0,0.2)]
+      "
+    >
+      <h3
+        className="text-lg font-medium mb-4 bg-gradient-to-r from-star-light to-gold bg-clip-text text-transparent"
+        style={{ fontFamily: 'var(--font-serif)' }}
+      >
+        {label}
+      </h3>
       <div className="space-y-3">
         <div className="grid grid-cols-3 gap-2">
           <Select
@@ -227,48 +298,125 @@ ${context2}
   }, [person1, person2, provider, currentSettings, enableThinking, enableWebSearch, searchApiKey])
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      {/* 左侧：双人输入 */}
-      <div className="lg:col-span-1 space-y-4">
-        <PersonInput label="第一人" value={person1} onChange={setPerson1} />
-        <PersonInput label="第二人" value={person2} onChange={setPerson2} />
+    <div className="animate-fade-in space-y-8 max-w-6xl mx-auto">
+      {/* 顶部：双人信息输入 + 按钮 */}
+      <div
+        className="
+          relative p-6 lg:p-8
+          bg-gradient-to-br from-white/[0.04] to-transparent
+          backdrop-blur-xl border border-white/[0.08] rounded-2xl
+          shadow-[0_8px_32px_rgba(0,0,0,0.3)]
+        "
+      >
+        {/* 顶部发光线 */}
+        <div
+          className="
+            absolute top-0 left-1/2 -translate-x-1/2
+            w-1/3 h-px
+            bg-gradient-to-r from-transparent via-gold/50 to-transparent
+          "
+        />
 
-        <Button
-          onClick={handleAnalyze}
-          disabled={loading || !currentSettings.apiKey}
-          className="w-full"
-        >
-          {loading ? '分析中...' : currentSettings.apiKey ? '开始合盘分析' : '请先配置 API'}
-        </Button>
-      </div>
+        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 mb-6">
+          <h2
+            className="
+              text-xl lg:text-2xl font-semibold
+              bg-gradient-to-r from-gold via-gold-light to-gold
+              bg-clip-text text-transparent
+            "
+            style={{ fontFamily: 'var(--font-serif)' }}
+          >
+            双人合盘
+          </h2>
 
-      {/* 右侧：分析结果 */}
-      <div className="lg:col-span-2">
+          <Button
+            onClick={handleAnalyze}
+            disabled={loading || !currentSettings.apiKey}
+            size="sm"
+            variant="gold"
+          >
+            {loading ? (
+              <span className="flex items-center gap-2">
+                <span className="w-3 h-3 border-2 border-night border-t-transparent rounded-full animate-spin" />
+                分析中
+              </span>
+            ) : currentSettings.apiKey ? '开始合盘分析' : '请先配置 API'}
+          </Button>
+        </div>
+
+        {/* 双人信息输入区 */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <PersonInput label="第一人" value={person1} onChange={setPerson1} />
+          <PersonInput label="第二人" value={person2} onChange={setPerson2} />
+        </div>
+
+        {/* 错误提示 */}
         {error && (
-          <div className="glass p-4 bg-misfortune/10 text-misfortune text-sm mb-4">
+          <div className="mt-4 p-3 rounded-lg bg-misfortune/10 text-misfortune text-sm border border-misfortune/20">
             {error}
           </div>
         )}
+      </div>
 
-        <div className="glass p-6 h-full min-h-[500px]">
-          {result ? (
-            <>
-              <h2 className="text-xl font-semibold text-amber mb-4">合盘分析结果</h2>
-              <div className="text-text-secondary whitespace-pre-wrap leading-relaxed">
-                {result}
-              </div>
-            </>
-          ) : loading ? (
-            <div className="flex items-center justify-center h-full gap-2 text-text-muted">
-              <div className="w-4 h-4 border-2 border-star border-t-transparent rounded-full animate-spin" />
-              <span>正在分析两人契合度...</span>
-            </div>
-          ) : (
-            <div className="flex items-center justify-center h-full text-text-muted">
-              输入双方信息并点击「开始合盘分析」
-            </div>
-          )}
-        </div>
+      {/* 下方：分析结果 */}
+      <div
+        className="
+          relative p-6 lg:p-8
+          bg-gradient-to-br from-white/[0.04] to-transparent
+          backdrop-blur-xl border border-white/[0.08] rounded-2xl
+          shadow-[0_8px_32px_rgba(0,0,0,0.3)]
+        "
+      >
+        {/* 顶部发光线 */}
+        <div
+          className="
+            absolute top-0 left-1/2 -translate-x-1/2
+            w-1/3 h-px
+            bg-gradient-to-r from-transparent via-star/50 to-transparent
+          "
+        />
+
+        {/* 未配置提示 */}
+        {!currentSettings.apiKey && !result && (
+          <div className="text-text-muted text-sm py-8 text-center">
+            <div className="text-3xl mb-3 opacity-30">⚭</div>
+            请先在设置中配置 AI 模型的 API Key，即可获得双人合盘分析。
+          </div>
+        )}
+
+        {/* 未分析提示 */}
+        {currentSettings.apiKey && !result && !loading && (
+          <div className="text-text-muted text-sm py-8 text-center">
+            <div className="text-3xl mb-3 opacity-30">⚭</div>
+            输入双方信息并点击「开始合盘分析」
+          </div>
+        )}
+
+        {/* 加载中 */}
+        {loading && !result && (
+          <div className="flex items-center justify-center gap-3 text-text-muted py-12">
+            <div className="w-5 h-5 border-2 border-star border-t-transparent rounded-full animate-spin" />
+            <span>正在分析两人契合度...</span>
+          </div>
+        )}
+
+        {/* 分析结果 - 书法字体 + Markdown 渲染 */}
+        {result && (
+          <div
+            className="
+              prose prose-invert max-w-none
+              text-text-secondary text-lg lg:text-xl leading-loose
+            "
+            style={{ fontFamily: 'var(--font-brush)' }}
+          >
+            <ReactMarkdown
+              remarkPlugins={[remarkGfm]}
+              components={MarkdownComponents}
+            >
+              {result}
+            </ReactMarkdown>
+          </div>
+        )}
       </div>
     </div>
   )
