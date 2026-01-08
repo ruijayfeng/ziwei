@@ -6,7 +6,7 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { FunctionalAstrolabe } from '@/lib/astro'
 import type { BirthInfo } from '@/lib/astro'
-import type { KLineData } from '@/lib/fortune-score'
+import type { LifetimeKLinePoint } from '@/lib/fortune-score'
 
 /* ------------------------------------------------------------
    命盘状态
@@ -37,9 +37,8 @@ export const useChartStore = create<ChartState>()((set) => ({
    ------------------------------------------------------------ */
 
 interface KLineCache {
-  decadal: KLineData[]
-  yearly: KLineData[]
-  monthly: Record<number, KLineData[]>
+  lifetime: LifetimeKLinePoint[]  // 1-100 岁完整数据
+  isGenerating: boolean           // 是否正在生成 reason
 }
 
 interface ContentCacheState {
@@ -53,9 +52,9 @@ interface ContentCacheState {
 
   // K 线数据
   klineCache: KLineCache | null
-  klineEvents: Record<string, string>  // 事件描述缓存
   setKlineCache: (cache: KLineCache) => void
-  setKlineEvent: (key: string, description: string) => void
+  updateKlineReasons: (reasons: { age: number; reason: string }[]) => void
+  setKlineGenerating: (isGenerating: boolean) => void
 
   // 清除所有缓存
   clearAll: () => void
@@ -65,7 +64,6 @@ export const useContentCacheStore = create<ContentCacheState>()((set) => ({
   aiInterpretation: null,
   yearlyFortune: {},
   klineCache: null,
-  klineEvents: {},
 
   setAiInterpretation: (content) => set({ aiInterpretation: content }),
 
@@ -75,15 +73,32 @@ export const useContentCacheStore = create<ContentCacheState>()((set) => ({
 
   setKlineCache: (cache) => set({ klineCache: cache }),
 
-  setKlineEvent: (key, description) => set((state) => ({
-    klineEvents: { ...state.klineEvents, [key]: description },
-  })),
+  updateKlineReasons: (reasons) => set((state) => {
+    if (!state.klineCache) return state
+    const updatedLifetime = state.klineCache.lifetime.map(point => {
+      const found = reasons.find(r => r.age === point.age)
+      return found ? { ...point, reason: found.reason } : point
+    })
+    return {
+      klineCache: {
+        ...state.klineCache,
+        lifetime: updatedLifetime,
+        isGenerating: false,
+      },
+    }
+  }),
+
+  setKlineGenerating: (isGenerating) => set((state) => {
+    if (!state.klineCache) return state
+    return {
+      klineCache: { ...state.klineCache, isGenerating },
+    }
+  }),
 
   clearAll: () => set({
     aiInterpretation: null,
     yearlyFortune: {},
     klineCache: null,
-    klineEvents: {},
   }),
 }))
 

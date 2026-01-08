@@ -14,6 +14,8 @@
    ============================================================ */
 
 import type FunctionalAstrolabe from 'iztro/lib/astro/FunctionalAstrolabe'
+import { extractKnowledge } from '../knowledge'
+import { chat, type LLMConfig } from './llm'
 
 /* ============================================================
    类型定义
@@ -46,6 +48,32 @@ export interface EventData {
   title: string              // 简短标题
   description?: string       // LLM 生成的详细描述
   stars: string[]            // 相关星曜
+}
+
+/* ============================================================
+   人生 K 线数据结构 (100 年视图)
+   ============================================================ */
+
+export interface LifetimeKLinePoint {
+  age: number              // 1-100
+  year: number             // 公历年份
+  ganZhi: string           // 流年干支（如"甲辰"）
+  daYun: string            // 大运干支（10年一变）
+  daYunRange: string       // 大运年龄范围（如"6-15"）
+  open: number             // 期初运势
+  close: number            // 期末运势
+  high: number             // 最高点
+  low: number              // 最低点
+  score: number            // 综合评分
+  reason?: string          // LLM 生成的运势描述
+  dimensions: {            // 四维度
+    career: number
+    wealth: number
+    relationship: number
+    health: number
+  }
+  // 用于 LLM 生成 reason 的元数据
+  yearlyMutagens?: string[]  // 流年四化
 }
 
 /* ============================================================
@@ -876,6 +904,479 @@ function generateBasicEvents(
   }
 
   return events
+}
+
+/* ============================================================
+   人生 K 线数据生成 (100 年视图) - 大运周期模型
+   ============================================================
+
+   核心思路：
+   - Y 轴 = 运势评分 (固定 0-100)
+   - 大运决定基础水位 (好大运 60-90, 差大运 20-50)
+   - 流年四化在大运基础上波动 (±15-25)
+   - 月度四化产生年内 OHLC 振幅
+
+   这样 K 线会有明显的大运周期和年度起伏
+   ============================================================ */
+
+/**
+ * 六十甲子表
+ */
+const SIXTY_JIAZI = [
+  '甲子', '乙丑', '丙寅', '丁卯', '戊辰', '己巳', '庚午', '辛未', '壬申', '癸酉',
+  '甲戌', '乙亥', '丙子', '丁丑', '戊寅', '己卯', '庚辰', '辛巳', '壬午', '癸未',
+  '甲申', '乙酉', '丙戌', '丁亥', '戊子', '己丑', '庚寅', '辛卯', '壬辰', '癸巳',
+  '甲午', '乙未', '丙申', '丁酉', '戊戌', '己亥', '庚子', '辛丑', '壬寅', '癸卯',
+  '甲辰', '乙巳', '丙午', '丁未', '戊申', '己酉', '庚戌', '辛亥', '壬子', '癸丑',
+  '甲寅', '乙卯', '丙辰', '丁巳', '戊午', '己未', '庚申', '辛酉', '壬戌', '癸亥',
+]
+
+/**
+ * 根据公历年份计算流年干支
+ */
+function getYearGanZhi(year: number): string {
+  const offset = (year - 1984) % 60
+  const index = offset < 0 ? offset + 60 : offset
+  return SIXTY_JIAZI[index]
+}
+
+/**
+ * 查找指定年龄所属的大限
+ */
+function findDecadalForAge(
+  chart: FunctionalAstrolabe,
+  age: number
+): { daYun: string; range: string; palaceName: string } {
+  for (const palace of chart.palaces) {
+    const decadal = palace.decadal
+    if (!decadal?.range) continue
+
+    const [startAge, endAge] = decadal.range
+    if (age >= startAge && age <= endAge) {
+      const stem = String(decadal.heavenlyStem || '')
+      const branch = String(decadal.earthlyBranch || '')
+      return {
+        daYun: stem + branch,
+        range: `${startAge}-${endAge}`,
+        palaceName: palace.name,
+      }
+    }
+  }
+
+  return { daYun: '童限', range: '1-5', palaceName: '命宫' }
+}
+
+/**
+ * 计算大运宫位的基础分数 (决定10年的运势水位)
+ */
+function calculateDecadalBaseScore(
+  chart: FunctionalAstrolabe,
+  age: number
+): number {
+  const { palaceName } = findDecadalForAge(chart, age)
+  const palace = chart.palaces.find(p => p.name === palaceName)
+
+  if (!palace) return 50
+
+  let score = 45
+
+  // ─── 主星评分 (权重最大) ───
+  for (const star of palace.majorStars) {
+    const name = String(star.name)
+    const baseScore = STAR_BASE_SCORE[name] || 0
+    const brightness = star.brightness ? String(star.brightness) : '平'
+    const coef = BRIGHTNESS_COEF[brightness] || 1.0
+
+    score += baseScore * coef * 1.2
+
+    // 四化加成
+    if (star.mutagen) {
+      const mutagen = String(star.mutagen)
+      if (mutagen.includes('禄')) score += 18
+      else if (mutagen.includes('权')) score += 15
+      else if (mutagen.includes('科')) score += 12
+      else if (mutagen.includes('忌')) score -= 22
+    }
+  }
+
+  // ─── 辅星评分 ───
+  for (const star of palace.minorStars) {
+    const name = String(star.name)
+    const baseScore = STAR_BASE_SCORE[name] || 0
+    score += baseScore * 0.8
+  }
+
+  return score
+}
+
+/**
+ * 计算流年修正分数 (在大运基础上的波动)
+ */
+function calculateYearlyModifier(
+  chart: FunctionalAstrolabe,
+  year: number
+): { modifier: number; mutagens: string[] } {
+  let modifier = 0
+  const mutagens: string[] = []
+
+  try {
+    const date = new Date(`${year}-06-15`)
+    const horoscope = chart.horoscope(date)
+
+    // ─── 流年四化 (主要波动来源) ───
+    const yearlyMutagen = horoscope.yearly.mutagen || []
+    for (const star of yearlyMutagen) {
+      const starName = String(star)
+      mutagens.push(starName)
+
+      if (starName.includes('禄')) modifier += 20
+      else if (starName.includes('权')) modifier += 16
+      else if (starName.includes('科')) modifier += 12
+      else if (starName.includes('忌')) modifier -= 25
+    }
+
+    // ─── 流年命宫位置 ───
+    const yearlyPalaceIndex = horoscope.yearly.index
+    const yearlyPalace = chart.palaces[yearlyPalaceIndex]
+    if (yearlyPalace) {
+      for (const star of yearlyPalace.majorStars) {
+        const baseScore = STAR_BASE_SCORE[star.name] || 0
+        modifier += baseScore * 0.5
+      }
+      for (const star of yearlyPalace.minorStars) {
+        const baseScore = STAR_BASE_SCORE[star.name] || 0
+        modifier += baseScore * 0.3
+      }
+    }
+
+  } catch {
+    // 忽略错误
+  }
+
+  // 随机波动
+  modifier += (Math.random() - 0.5) * 15
+
+  return { modifier, mutagens }
+}
+
+/**
+ * 生成 1-100 岁的人生 K 线数据 (大运周期模型)
+ * 关键：每年 open = 前一年 close，保证 K 线连贯
+ */
+export function generateLifetimeKLines(
+  chart: FunctionalAstrolabe,
+  birthYear: number
+): LifetimeKLinePoint[] {
+  const klines: LifetimeKLinePoint[] = []
+
+  // 预计算所有大运的基础分数 (避免重复计算)
+  const decadalScores: Map<string, number> = new Map()
+
+  // 上一年收盘价，用于连接 K 线
+  let prevClose = 50
+
+  for (let age = 1; age <= 100; age++) {
+    const year = birthYear + age - 1
+    const ganZhi = getYearGanZhi(year)
+    const { daYun, range: daYunRange } = findDecadalForAge(chart, age)
+
+    // ─── 获取大运基础分 (缓存) ───
+    if (!decadalScores.has(daYunRange)) {
+      decadalScores.set(daYunRange, calculateDecadalBaseScore(chart, age))
+    }
+    const decadalBase = decadalScores.get(daYunRange) || 50
+
+    // ─── 流年修正 ───
+    const { modifier: yearlyModifier, mutagens } = calculateYearlyModifier(chart, year)
+
+    // ─── 年度目标分 (大运 + 流年修正) ───
+    const yearTarget = decadalBase + yearlyModifier
+
+    // ─── 当年开盘 = 前一年收盘 (K线连贯的关键) ───
+    const open = prevClose
+
+    // ─── 收盘向目标分靠拢，但有波动 ───
+    // 每年向目标分移动 30-70%，加上随机波动
+    const moveRatio = 0.3 + Math.random() * 0.4
+    const closeBase = open + (yearTarget - open) * moveRatio
+    const close = closeBase + (Math.random() - 0.5) * 15
+
+    // ─── 年内高低点 ───
+    // 基于开盘收盘，加上月度波动产生影线
+    const midPoint = (open + close) / 2
+    const volatility = Math.abs(yearTarget - open) * 0.3 + Math.random() * 10
+
+    let high = Math.max(open, close) + volatility * (0.5 + Math.random() * 0.5)
+    let low = Math.min(open, close) - volatility * (0.5 + Math.random() * 0.5)
+
+    // 确保 high/low 在合理范围
+    high = Math.min(100, high)
+    low = Math.max(0, low)
+
+    // ─── 更新 prevClose ───
+    prevClose = close
+
+    // ─── 综合评分 ───
+    const score = Math.round((open + close + high + low) / 4)
+
+    // ─── 四维度评分 ───
+    const dimensions = {
+      career: normalize(midPoint + (Math.random() - 0.5) * 15),
+      wealth: normalize(midPoint * 0.95 + (Math.random() - 0.5) * 15),
+      relationship: normalize(midPoint * 0.9 + (Math.random() - 0.5) * 15),
+      health: normalize(midPoint * 0.92 + (Math.random() - 0.5) * 15),
+    }
+
+    klines.push({
+      age,
+      year,
+      ganZhi,
+      daYun,
+      daYunRange,
+      open: Math.round(open),
+      close: Math.round(close),
+      high: Math.round(high),
+      low: Math.round(low),
+      score: Math.max(0, Math.min(100, score)),
+      dimensions,
+      yearlyMutagens: mutagens,
+    })
+  }
+
+  return klines
+}
+
+/* ============================================================
+   LLM K线生成 - 由 AI 决定运势走向
+   ============================================================ */
+
+/**
+ * 构建 K 线生成的系统提示词
+ */
+function buildKLineSystemPrompt(): string {
+  return `你是一位精通紫微斗数的命理大师，擅长根据命盘推演人生运势走向。
+
+你的任务是根据命盘信息，为命主生成 1-100 岁的人生运势 K 线数据。
+
+## K 线规则
+
+1. **Y 轴含义**: 运势分 (0-100)
+   - 80+ 大吉：人生巅峰，诸事顺遂
+   - 60-79 吉：运势良好，有所收获
+   - 40-59 平：平稳过渡，波澜不惊
+   - 20-39 凶：运势低迷，需要谨慎
+   - 0-19 大凶：人生低谷，艰难时期
+
+2. **K 线连贯性**: 每年的 open 必须等于上一年的 close
+   - 第 1 岁的 open 从 50 开始
+   - 此后每年 open = 前一年 close
+
+3. **大运周期**: 每个大运（通常10年）应该有相对一致的运势水位
+   - 好的大运整体偏高 (60-90)
+   - 差的大运整体偏低 (15-50)
+   - 大运交接处可以有明显的转折
+
+4. **年内波动**: high 和 low 表示年内最高点和最低点
+   - high >= max(open, close)
+   - low <= min(open, close)
+   - 影线长度反映该年的波动程度
+
+5. **运势逻辑**:
+   - 化禄、化权、化科 → 运势上升
+   - 化忌、煞星 → 运势下降
+   - 紫微、天府坐命 → 整体运势较好
+   - 杀破狼组合 → 人生起伏较大
+   - 六吉星会照 → 贵人相助
+   - 六煞星冲照 → 阻碍较多
+
+## 输出格式
+
+返回 JSON 数组，每个元素包含:
+- age: 年龄 (1-100)
+- open: 年初运势
+- close: 年末运势
+- high: 年内最高
+- low: 年内最低
+- brief: 一句话运势描述（10字以内）
+
+示例:
+\`\`\`json
+[
+  {"age":1,"open":50,"close":52,"high":55,"low":48,"brief":"平稳起步"},
+  {"age":2,"open":52,"close":58,"high":62,"low":50,"brief":"渐入佳境"},
+  ...
+]
+\`\`\`
+
+重要：只返回 JSON 数组，不要有其他文字。`
+}
+
+/**
+ * 构建命盘数据的用户提示词
+ */
+function buildKLineUserPrompt(
+  chart: FunctionalAstrolabe,
+  birthYear: number
+): string {
+  const knowledge = extractKnowledge(chart, birthYear)
+
+  // 格式化十二宫信息
+  const palacesInfo = knowledge.十二宫.map(p => {
+    const stars = p.majorStars.map(s => {
+      let str = s.name
+      if (s.brightness) str += `(${s.brightness})`
+      if (s.mutagen) str += `[${s.mutagen}]`
+      return str
+    }).join('、')
+    const minors = p.minorStars.filter(s => s.name).map(s => {
+      let str = s.name
+      if (s.mutagen) str += `[${s.mutagen}]`
+      return str
+    }).join('、')
+    return `${p.name}(${p.stem}): ${stars || '无主星'}${minors ? ' | ' + minors : ''}`
+  }).join('\n')
+
+  // 格式化大限信息
+  const decadalsInfo = knowledge.大限.map(d =>
+    `${d.ageRange}岁 → ${d.palaceName}(${d.stem}) 四化:${d.mutagens.join('、') || '无'}`
+  ).join('\n')
+
+  // 格式化流年信息
+  const yearsInfo = knowledge.流年.map(y =>
+    `${y.year}年(${y.stem}${y.branch}) 四化:${y.mutagens.join('、')} 命宫:${y.palaceName}`
+  ).join('\n')
+
+  // 四化分布
+  const sihuaInfo = knowledge.四化分布.map(s =>
+    `${s.star}${s.sihua.name} → ${s.palace}`
+  ).join('、')
+
+  return `请根据以下命盘信息，生成 1-100 岁的人生 K 线数据。
+
+## 基本信息
+- 出生年份: ${birthYear}年
+- 命宫主星: ${knowledge.命宫主星.map(s => s.name).join('、') || '无主星'}
+- 身宫位置: ${knowledge.身宫位置}
+- 身宫主星: ${knowledge.身宫主星.map(s => s.name).join('、') || '无主星'}
+
+## 本命四化
+${sihuaInfo}
+
+## 十二宫配置
+${palacesInfo}
+
+## 大限走向
+${decadalsInfo}
+
+## 近期流年（参考）
+${yearsInfo}
+
+请生成 100 年的 K 线数据 JSON。`
+}
+
+/**
+ * 解析 LLM 返回的 K 线数据
+ */
+interface LLMKLineItem {
+  age: number
+  open: number
+  close: number
+  high: number
+  low: number
+  brief: string
+}
+
+function parseLLMKLineResponse(response: string): LLMKLineItem[] | null {
+  try {
+    // 尝试提取 JSON
+    const jsonMatch = response.match(/\[[\s\S]*\]/)
+    if (!jsonMatch) return null
+
+    const data = JSON.parse(jsonMatch[0])
+    if (!Array.isArray(data)) return null
+
+    // 验证数据格式
+    return data.map(item => ({
+      age: Number(item.age) || 0,
+      open: Number(item.open) || 50,
+      close: Number(item.close) || 50,
+      high: Number(item.high) || 50,
+      low: Number(item.low) || 50,
+      brief: String(item.brief || ''),
+    }))
+  } catch {
+    return null
+  }
+}
+
+/**
+ * 使用 LLM 生成 K 线数据
+ */
+export async function generateKLinesWithLLM(
+  chart: FunctionalAstrolabe,
+  birthYear: number,
+  llmConfig: LLMConfig,
+  onProgress?: (progress: string) => void
+): Promise<LifetimeKLinePoint[]> {
+  onProgress?.('正在分析命盘...')
+
+  const systemPrompt = buildKLineSystemPrompt()
+  const userPrompt = buildKLineUserPrompt(chart, birthYear)
+
+  onProgress?.('AI 正在推演运势走向...')
+
+  const response = await chat(llmConfig, [
+    { role: 'system', content: systemPrompt },
+    { role: 'user', content: userPrompt },
+  ])
+
+  onProgress?.('正在解析数据...')
+
+  const llmData = parseLLMKLineResponse(response)
+
+  if (!llmData || llmData.length === 0) {
+    throw new Error('AI 返回数据解析失败')
+  }
+
+  // 转换为 LifetimeKLinePoint 格式
+  const klines: LifetimeKLinePoint[] = []
+
+  for (let age = 1; age <= 100; age++) {
+    const llmItem = llmData.find(d => d.age === age)
+    const year = birthYear + age - 1
+    const ganZhi = getYearGanZhi(year)
+    const { daYun, range: daYunRange } = findDecadalForAge(chart, age)
+
+    const open = llmItem?.open ?? 50
+    const close = llmItem?.close ?? 50
+    const high = llmItem?.high ?? Math.max(open, close)
+    const low = llmItem?.low ?? Math.min(open, close)
+    const score = Math.round((open + close + high + low) / 4)
+
+    klines.push({
+      age,
+      year,
+      ganZhi,
+      daYun,
+      daYunRange,
+      open: Math.round(open),
+      close: Math.round(close),
+      high: Math.round(high),
+      low: Math.round(low),
+      score: Math.max(0, Math.min(100, score)),
+      reason: llmItem?.brief,
+      dimensions: {
+        career: normalize(score + (Math.random() - 0.5) * 10),
+        wealth: normalize(score * 0.95 + (Math.random() - 0.5) * 10),
+        relationship: normalize(score * 0.9 + (Math.random() - 0.5) * 10),
+        health: normalize(score * 0.92 + (Math.random() - 0.5) * 10),
+      },
+      yearlyMutagens: [],
+    })
+  }
+
+  onProgress?.('生成完成')
+  return klines
 }
 
 /* ============================================================

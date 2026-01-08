@@ -1,54 +1,207 @@
 /* ============================================================
-   人生 K 线 - 主组件
+   人生 K 线 - Recharts 实现
    ============================================================
 
-   三种时间维度:
-   - 大限 (10年): 人生全貌
-   - 三年 (年度): 当前 + 未来3年
-   - 当月 (月度): 选定年份12个月
+   核心特性:
+   - 1-100 岁完整人生 K 线
+   - 大运分界标注
+   - 峰值红星标记
+   - 深色玻璃态 Tooltip
    ============================================================ */
 
-import { useState, useMemo, useCallback, useRef } from 'react'
-import ReactEChartsCore from 'echarts-for-react/lib/core'
-import * as echarts from 'echarts/core'
-import { CandlestickChart, LineChart } from 'echarts/charts'
+import { useState, useMemo, useCallback } from 'react'
 import {
-  GridComponent,
-  TooltipComponent,
-  DataZoomComponent,
-  MarkLineComponent,
-  MarkPointComponent,
-} from 'echarts/components'
-import { CanvasRenderer } from 'echarts/renderers'
+  ComposedChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  ReferenceLine,
+  Label,
+  LabelList,
+} from 'recharts'
 import { useChartStore, useSettingsStore, useContentCacheStore } from '@/stores'
-import { EventCard } from './EventCard'
 import { ScoreRadar } from './ScoreRadar'
 import {
-  generateDecadalKLines,
-  generateYearlyKLines,
-  generateMonthlyKLines,
-  type KLineData,
-  type EventData,
+  generateLifetimeKLines,
+  generateKLinesWithLLM,
+  type LifetimeKLinePoint,
 } from '@/lib/fortune-score'
-import { streamChat, type LLMConfig } from '@/lib/llm'
-
-// 注册 ECharts 组件
-echarts.use([
-  CandlestickChart,
-  LineChart,
-  GridComponent,
-  TooltipComponent,
-  DataZoomComponent,
-  MarkLineComponent,
-  MarkPointComponent,
-  CanvasRenderer,
-])
+import { type LLMConfig } from '@/lib/llm'
 
 /* ============================================================
-   类型定义
+   自定义 Tooltip (深色玻璃态)
    ============================================================ */
 
-type ViewMode = 'decadal' | 'yearly' | 'monthly'
+interface TooltipProps {
+  active?: boolean
+  payload?: Array<{ payload: LifetimeKLinePoint }>
+}
+
+function CustomTooltip({ active, payload }: TooltipProps) {
+  if (!active || !payload?.length) return null
+
+  const data = payload[0].payload
+  const isUp = data.close >= data.open
+  const scoreLevel = data.score >= 80 ? '大吉' :
+                     data.score >= 60 ? '吉' :
+                     data.score >= 40 ? '平' :
+                     data.score >= 20 ? '凶' : '大凶'
+
+  return (
+    <div className="bg-night/95 backdrop-blur-md p-5 rounded-xl shadow-2xl border border-white/10 z-50 w-[320px] md:w-[380px]">
+      {/* ─── Header ─── */}
+      <div className="flex justify-between items-start mb-3 border-b border-white/10 pb-3">
+        <div>
+          <p className="text-xl font-bold text-white" style={{ fontFamily: 'var(--font-serif)' }}>
+            {data.year} {data.ganZhi}年
+            <span className="text-base text-text-muted ml-2">({data.age}岁)</span>
+          </p>
+          <p className="text-sm text-star-light font-medium mt-1">
+            大运：{data.daYun} ({data.daYunRange})
+          </p>
+        </div>
+        <div className={`text-sm font-bold px-3 py-1.5 rounded-lg ${
+          data.score >= 60 ? 'bg-green-500/20 text-green-400' :
+          data.score >= 40 ? 'bg-amber-500/20 text-amber-400' :
+          'bg-rose-500/20 text-rose-400'
+        }`}>
+          {scoreLevel} {data.score}分
+        </div>
+      </div>
+
+      {/* ─── OHLC Grid ─── */}
+      <div className="grid grid-cols-4 gap-2 text-xs mb-4 bg-white/[0.03] p-3 rounded-lg">
+        <div className="text-center">
+          <span className="block text-text-muted mb-1">年初</span>
+          <span className="font-mono text-white font-bold">{data.open}</span>
+        </div>
+        <div className="text-center">
+          <span className="block text-text-muted mb-1">年末</span>
+          <span className={`font-mono font-bold ${isUp ? 'text-green-400' : 'text-rose-400'}`}>{data.close}</span>
+        </div>
+        <div className="text-center">
+          <span className="block text-text-muted mb-1">年内高</span>
+          <span className="font-mono text-gold font-bold">{data.high}</span>
+        </div>
+        <div className="text-center">
+          <span className="block text-text-muted mb-1">年内低</span>
+          <span className="font-mono text-rose-400 font-bold">{data.low}</span>
+        </div>
+      </div>
+
+      {/* ─── Reason ─── */}
+      <div className="text-sm text-text-secondary leading-relaxed max-h-[120px] overflow-y-auto"
+           style={{ fontFamily: 'var(--font-brush)' }}>
+        {data.reason || (
+          <span className="text-text-muted flex items-center gap-2">
+            <span className="inline-block w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
+            AI 解读生成中...
+          </span>
+        )}
+      </div>
+
+      {/* ─── 流年四化 ─── */}
+      {data.yearlyMutagens && data.yearlyMutagens.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 mt-3 pt-3 border-t border-white/10">
+          {data.yearlyMutagens.map((m, i) => (
+            <span key={i} className="px-2 py-0.5 rounded text-xs bg-star/20 text-star-light">
+              {m}
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+/* ============================================================
+   自定义蜡烛图形状
+   ============================================================ */
+
+interface CandleShapeProps {
+  x?: number
+  y?: number
+  width?: number
+  height?: number
+  payload?: LifetimeKLinePoint
+  yAxis?: { scale: (value: number) => number }
+}
+
+function CandleShape(props: CandleShapeProps) {
+  const { x = 0, y = 0, width = 0, height = 0, payload, yAxis } = props
+  if (!payload) return null
+
+  const isUp = payload.close >= payload.open
+  const color = isUp ? '#22c55e' : '#ef4444'
+  const strokeColor = isUp ? '#15803d' : '#b91c1c'
+
+  let highY = y
+  let lowY = y + height
+
+  if (yAxis && typeof yAxis.scale === 'function') {
+    try {
+      highY = yAxis.scale(payload.high)
+      lowY = yAxis.scale(payload.low)
+    } catch {
+      highY = y
+      lowY = y + height
+    }
+  }
+
+  const center = x + width / 2
+  const renderHeight = height < 2 ? 2 : height
+
+  return (
+    <g>
+      {/* 影线 */}
+      <line x1={center} y1={highY} x2={center} y2={lowY} stroke={strokeColor} strokeWidth={1.5} />
+      {/* 蜡烛体 */}
+      <rect
+        x={x}
+        y={y}
+        width={width}
+        height={renderHeight}
+        fill={color}
+        stroke={strokeColor}
+        strokeWidth={0.5}
+        rx={1}
+      />
+    </g>
+  )
+}
+
+/* ============================================================
+   峰值星标组件
+   ============================================================ */
+
+interface PeakLabelProps {
+  x?: number
+  y?: number
+  width?: number
+  value?: number
+  maxHigh: number
+}
+
+function PeakLabel(props: PeakLabelProps) {
+  const { x = 0, y = 0, width = 0, value, maxHigh } = props
+  if (value !== maxHigh) return null
+
+  return (
+    <g>
+      {/* 金色星星 - 只标注峰值位置，不显示分数 */}
+      <path
+        d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"
+        transform={`translate(${x + width / 2 - 6}, ${y - 18}) scale(0.5)`}
+        fill="#fbbf24"
+        stroke="#b45309"
+        strokeWidth="1"
+      />
+    </g>
+  )
+}
 
 /* ============================================================
    主组件
@@ -57,16 +210,13 @@ type ViewMode = 'decadal' | 'yearly' | 'monthly'
 export function LifeKLine() {
   const { chart, birthInfo } = useChartStore()
   const { provider, getCurrentSettings, enableThinking, enableWebSearch, searchApiKey } = useSettingsStore()
-  const { klineCache, klineEvents, setKlineCache, setKlineEvent } = useContentCacheStore()
+  const { klineCache, setKlineCache } = useContentCacheStore()
 
-  const [viewMode, setViewMode] = useState<ViewMode>('decadal')
-  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear())
-  const [selectedPeriod, setSelectedPeriod] = useState<KLineData | null>(null)
   const [isGenerating, setIsGenerating] = useState(false)
+  const [progress, setProgress] = useState('')
+  const [selectedPoint, setSelectedPoint] = useState<LifetimeKLinePoint | null>(null)
 
-  const chartRef = useRef<ReactEChartsCore>(null)
-
-  // 构建 LLM 配置
+  // LLM 配置
   const llmConfig: LLMConfig = useMemo(() => {
     const settings = getCurrentSettings()
     return {
@@ -81,235 +231,83 @@ export function LifeKLine() {
   }, [provider, getCurrentSettings, enableThinking, enableWebSearch, searchApiKey])
 
   /* ------------------------------------------------------------
-     生成 K 线数据
+     生成 K 线数据 (由 AI 决定涨跌)
      ------------------------------------------------------------ */
 
-  const generateKLines = useCallback(() => {
-    if (!chart) return
+  const generateKLines = useCallback(async () => {
+    if (!chart || !birthInfo) return
 
     setIsGenerating(true)
-
-    const decadal = generateDecadalKLines(chart)
-    const yearly = generateYearlyKLines(chart)
-    const monthly: Record<number, KLineData[]> = {}
-
-    // 预生成当前年和未来3年的月度数据
-    const currentYear = new Date().getFullYear()
-    for (let y = currentYear; y <= currentYear + 3; y++) {
-      monthly[y] = generateMonthlyKLines(chart, y)
-    }
-
-    // 保存到全局缓存
-    setKlineCache({
-      decadal,
-      yearly,
-      monthly,
-    })
-
-    setIsGenerating(false)
-  }, [chart, setKlineCache])
-
-  /* ------------------------------------------------------------
-     当前显示的 K 线数据
-     ------------------------------------------------------------ */
-
-  const currentKLines = useMemo(() => {
-    if (!klineCache) return []
-
-    switch (viewMode) {
-      case 'decadal':
-        return klineCache.decadal
-      case 'yearly':
-        return klineCache.yearly
-      case 'monthly':
-        return klineCache.monthly[selectedYear] || []
-      default:
-        return []
-    }
-  }, [klineCache, viewMode, selectedYear])
-
-  /* ------------------------------------------------------------
-     ECharts 配置
-     ------------------------------------------------------------ */
-
-  const chartOption = useMemo(() => {
-    if (currentKLines.length === 0) return {}
-
-    const categories = currentKLines.map(k => k.period)
-    const ohlcData = currentKLines.map(k => [k.open, k.close, k.low, k.high])
-
-    // 标记点: 最高和最低
-    const maxIdx = currentKLines.reduce((max, k, i) =>
-      k.close > currentKLines[max].close ? i : max, 0)
-    const minIdx = currentKLines.reduce((min, k, i) =>
-      k.close < currentKLines[min].close ? i : min, 0)
-
-    return {
-      backgroundColor: 'transparent',
-      grid: {
-        left: '8%',
-        right: '8%',
-        top: '12%',
-        bottom: '18%',
-      },
-      xAxis: {
-        type: 'category',
-        data: categories,
-        axisLine: { lineStyle: { color: 'rgba(255,255,255,0.1)' } },
-        axisLabel: {
-          color: 'rgba(255,255,255,0.6)',
-          fontSize: 11,
-        },
-        splitLine: { show: false },
-      },
-      yAxis: {
-        type: 'value',
-        min: 0,
-        max: 100,
-        axisLine: { show: false },
-        axisLabel: {
-          color: 'rgba(255,255,255,0.4)',
-          fontSize: 10,
-        },
-        splitLine: {
-          lineStyle: { color: 'rgba(255,255,255,0.05)' },
-        },
-      },
-      tooltip: {
-        trigger: 'axis',
-        backgroundColor: 'rgba(15,15,35,0.95)',
-        borderColor: 'rgba(124,58,237,0.3)',
-        borderWidth: 1,
-        textStyle: { color: '#fff' },
-        formatter: (params: unknown[]) => {
-          const p = params[0] as { name: string; data: number[] }
-          const [open, close, low, high] = p.data
-          const trend = close >= open ? '↑' : '↓'
-          const color = close >= open ? '#22c55e' : '#ef4444'
-          return `
-            <div style="font-family: var(--font-serif);">
-              <div style="font-size: 14px; margin-bottom: 8px;">${p.name}</div>
-              <div style="color: ${color}; font-size: 20px; font-weight: bold;">
-                ${Math.round(close)} ${trend}
-              </div>
-              <div style="font-size: 11px; color: rgba(255,255,255,0.5); margin-top: 6px;">
-                高 ${Math.round(high)} · 低 ${Math.round(low)}
-              </div>
-            </div>
-          `
-        },
-      },
-      series: [
-        {
-          name: '运势',
-          type: 'candlestick',
-          data: ohlcData,
-          itemStyle: {
-            color: '#22c55e',       // 涨 (close > open)
-            color0: '#ef4444',      // 跌 (close < open)
-            borderColor: '#22c55e',
-            borderColor0: '#ef4444',
-          },
-          markPoint: {
-            symbol: 'circle',
-            symbolSize: 8,
-            data: [
-              {
-                name: '最高',
-                coord: [categories[maxIdx], currentKLines[maxIdx].high],
-                itemStyle: { color: '#fbbf24' },
-              },
-              {
-                name: '最低',
-                coord: [categories[minIdx], currentKLines[minIdx].low],
-                itemStyle: { color: '#8b5cf6' },
-              },
-            ],
-            label: { show: false },
-          },
-          markLine: {
-            silent: true,
-            symbol: 'none',
-            lineStyle: {
-              color: 'rgba(212,175,55,0.3)',
-              type: 'dashed',
-            },
-            data: [
-              { yAxis: 60, name: '吉' },
-              { yAxis: 40, name: '凶' },
-            ],
-            label: {
-              color: 'rgba(255,255,255,0.3)',
-              fontSize: 10,
-            },
-          },
-        },
-        // 趋势线
-        {
-          name: '趋势',
-          type: 'line',
-          data: currentKLines.map(k => k.close),
-          smooth: true,
-          symbol: 'none',
-          lineStyle: {
-            color: 'rgba(124,58,237,0.5)',
-            width: 2,
-          },
-          areaStyle: {
-            color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-              { offset: 0, color: 'rgba(124,58,237,0.2)' },
-              { offset: 1, color: 'rgba(124,58,237,0)' },
-            ]),
-          },
-        },
-      ],
-    }
-  }, [currentKLines])
-
-  /* ------------------------------------------------------------
-     图表点击事件
-     ------------------------------------------------------------ */
-
-  const onChartClick = useCallback((params: { dataIndex?: number }) => {
-    if (params.dataIndex !== undefined && currentKLines[params.dataIndex]) {
-      setSelectedPeriod(currentKLines[params.dataIndex])
-    }
-  }, [currentKLines])
-
-  /* ------------------------------------------------------------
-     LLM 生成事件描述
-     ------------------------------------------------------------ */
-
-  const generateEventDescription = useCallback(async (event: EventData, period: string) => {
-    const key = `${period}-${event.title}`
-    if (klineEvents[key]) return
-
-    if (!llmConfig.apiKey) {
-      setKlineEvent(key, '请配置 API Key 以获取详细解读')
-      return
-    }
-
-    const prompt = `作为紫微斗数大师，用一句话解读以下运势事件（不超过30字）：
-
-时期：${period}
-事件：${event.title}
-相关星曜：${event.stars.join('、')}
-性质：${event.type === 'positive' ? '吉' : '凶'}
-
-直接给出解读，不要任何前缀。`
+    setProgress('初始化...')
 
     try {
-      let result = ''
-      for await (const chunk of streamChat(llmConfig, [
-        { role: 'user', content: prompt }
-      ])) {
-        result += chunk
+      let lifetime: LifetimeKLinePoint[]
+
+      if (llmConfig.apiKey) {
+        // 使用 LLM 生成 (AI 决定涨跌)
+        lifetime = await generateKLinesWithLLM(
+          chart,
+          birthInfo.year,
+          llmConfig,
+          setProgress
+        )
+      } else {
+        // 无 API Key 时使用算法生成
+        setProgress('正在计算运势...')
+        lifetime = generateLifetimeKLines(chart, birthInfo.year)
       }
-      setKlineEvent(key, result.trim())
-    } catch {
-      setKlineEvent(key, '解读生成失败')
+
+      setKlineCache({ lifetime, isGenerating: false })
+      setProgress('')
+    } catch (error) {
+      console.error('K 线生成失败:', error)
+      setProgress('生成失败，请重试')
+
+      // 失败时使用算法兜底
+      const lifetime = generateLifetimeKLines(chart, birthInfo.year)
+      setKlineCache({ lifetime, isGenerating: false })
     }
-  }, [llmConfig, klineEvents, setKlineEvent])
+
+    setIsGenerating(false)
+  }, [chart, birthInfo, llmConfig, setKlineCache])
+
+  /* ------------------------------------------------------------
+     数据转换
+     ------------------------------------------------------------ */
+
+  const chartData = useMemo(() => {
+    if (!klineCache?.lifetime) return []
+    return klineCache.lifetime.map(d => ({
+      ...d,
+      bodyRange: [Math.min(d.open, d.close), Math.max(d.open, d.close)],
+    }))
+  }, [klineCache])
+
+  // 大运变化点
+  const daYunChanges = useMemo(() => {
+    if (!chartData.length) return []
+    return chartData.filter((d, i) => {
+      if (i === 0) return true
+      return d.daYun !== chartData[i - 1].daYun
+    })
+  }, [chartData])
+
+  // 最高点
+  const maxHigh = useMemo(() => {
+    if (!chartData.length) return 100
+    return Math.max(...chartData.map(d => d.high))
+  }, [chartData])
+
+  /* ------------------------------------------------------------
+     图表点击
+     ------------------------------------------------------------ */
+
+  const handleChartClick = useCallback((data: unknown) => {
+    const chartData = data as { activePayload?: Array<{ payload: LifetimeKLinePoint }> }
+    if (chartData.activePayload?.[0]?.payload) {
+      setSelectedPoint(chartData.activePayload[0].payload)
+    }
+  }, [])
 
   /* ------------------------------------------------------------
      渲染
@@ -325,157 +323,204 @@ export function LifeKLine() {
 
   return (
     <div className="animate-fade-in space-y-6">
-      {/* 标题区 */}
+      {/* ─── 标题区 ─── */}
       <div className="text-center">
         <h2
-          className="
-            text-2xl font-bold
-            bg-gradient-to-r from-star-light via-gold to-star-light
-            bg-clip-text text-transparent
-          "
+          className="text-2xl font-bold bg-gradient-to-r from-star-light via-gold to-star-light bg-clip-text text-transparent"
           style={{ fontFamily: 'var(--font-serif)' }}
         >
           人生 K 线
         </h2>
         <p className="text-text-muted text-sm mt-2">
-          {birthInfo?.year}年生 · 运势起伏一目了然
+          {birthInfo?.year}年生 · 100 年运势起伏一目了然
         </p>
       </div>
 
-      {/* 生成按钮 / 时间维度切换 */}
+      {/* ─── 生成按钮 / K 线图 ─── */}
       {!klineCache ? (
-        <div className="flex justify-center">
+        <div className="flex flex-col items-center gap-3">
           <button
             onClick={generateKLines}
             disabled={isGenerating}
-            className="
-              px-8 py-3 rounded-xl
-              bg-gradient-to-r from-star to-gold
-              text-night font-medium
-              hover:shadow-[0_0_30px_rgba(124,58,237,0.4)]
-              transition-all duration-300
-              disabled:opacity-50
-            "
+            className="px-8 py-3 rounded-xl bg-gradient-to-r from-star to-gold text-night font-medium hover:shadow-[0_0_30px_rgba(124,58,237,0.4)] transition-all duration-300 disabled:opacity-50"
           >
-            {isGenerating ? '生成中...' : '✨ 生成人生 K 线'}
+            {isGenerating ? (progress || '生成中...') : '✨ AI 生成人生 K 线'}
           </button>
+          {!llmConfig.apiKey && (
+            <p className="text-text-muted text-xs">提示：配置 API Key 可使用 AI 分析命盘生成</p>
+          )}
         </div>
       ) : (
         <>
-          {/* 时间维度切换 */}
-          <div className="flex justify-center gap-2">
-            {[
-              { key: 'decadal', label: '大限 (10年)', icon: '◈' },
-              { key: 'yearly', label: '三年', icon: '◎' },
-              { key: 'monthly', label: '月度', icon: '◇' },
-            ].map(tab => (
-              <button
-                key={tab.key}
-                onClick={() => setViewMode(tab.key as ViewMode)}
-                className={`
-                  px-4 py-2 rounded-lg text-sm
-                  transition-all duration-200
-                  ${viewMode === tab.key
-                    ? 'bg-star/20 text-star-light border border-star/30'
-                    : 'bg-white/[0.04] text-text-muted hover:bg-white/[0.08]'
-                  }
-                `}
-              >
-                <span className="mr-1">{tab.icon}</span>
-                {tab.label}
-              </button>
-            ))}
-          </div>
-
-          {/* 月度模式年份选择 */}
-          {viewMode === 'monthly' && klineCache && (
-            <div className="flex justify-center gap-2">
-              {Object.keys(klineCache.monthly).map(year => (
-                <button
-                  key={year}
-                  onClick={() => setSelectedYear(parseInt(year))}
-                  className={`
-                    px-3 py-1 rounded-md text-sm
-                    ${selectedYear === parseInt(year)
-                      ? 'bg-gold/20 text-gold'
-                      : 'text-text-muted hover:text-text'
-                    }
-                  `}
-                >
-                  {year}
-                </button>
-              ))}
-            </div>
-          )}
-
-          {/* K 线图 */}
-          <div
-            className="
-              relative p-4 rounded-2xl
-              bg-white/[0.02] border border-white/[0.06]
-              backdrop-blur-sm
-            "
-          >
+          {/* ─── K 线图 ─── */}
+          <div className="relative p-4 rounded-2xl bg-white/[0.02] border border-white/[0.06] backdrop-blur-sm">
             {/* 顶部发光线 */}
-            <div
-              className="
-                absolute top-0 left-1/2 -translate-x-1/2
-                w-1/2 h-px
-                bg-gradient-to-r from-transparent via-star/50 to-transparent
-              "
-            />
+            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-1/2 h-px bg-gradient-to-r from-transparent via-star/50 to-transparent" />
 
-            <ReactEChartsCore
-              ref={chartRef}
-              echarts={echarts}
-              option={chartOption}
-              style={{ height: '360px' }}
-              onEvents={{ click: onChartClick }}
-              opts={{ renderer: 'canvas' }}
-            />
-
-            {/* 图例 */}
-            <div className="flex justify-center gap-6 mt-4 text-xs text-text-muted">
-              <span className="flex items-center gap-1">
-                <span className="w-3 h-3 rounded-sm bg-[#22c55e]" /> 上涨
-              </span>
-              <span className="flex items-center gap-1">
-                <span className="w-3 h-3 rounded-sm bg-[#ef4444]" /> 下跌
-              </span>
-              <span className="flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full bg-[#fbbf24]" /> 峰值
-              </span>
-              <span className="flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full bg-[#8b5cf6]" /> 谷底
-              </span>
+            {/* 图表标题 */}
+            <div className="mb-4 flex justify-between items-center px-2">
+              <h3 className="text-lg font-bold text-white" style={{ fontFamily: 'var(--font-serif)' }}>
+                人生流年大运 K 线图
+              </h3>
+              <div className="flex gap-3 text-xs font-medium">
+                <span className="flex items-center text-green-400 bg-green-500/10 px-2 py-1 rounded">
+                  <div className="w-2 h-2 bg-green-500 mr-2 rounded-full" /> 吉运
+                </span>
+                <span className="flex items-center text-rose-400 bg-rose-500/10 px-2 py-1 rounded">
+                  <div className="w-2 h-2 bg-rose-500 mr-2 rounded-full" /> 凶运
+                </span>
+              </div>
             </div>
+
+            <ResponsiveContainer width="100%" height={500}>
+              <ComposedChart
+                data={chartData}
+                margin={{ top: 30, right: 10, left: 0, bottom: 20 }}
+                onClick={handleChartClick}
+              >
+                <CartesianGrid
+                  strokeDasharray="3 3"
+                  vertical={false}
+                  stroke="rgba(255,255,255,0.05)"
+                />
+
+                <XAxis
+                  dataKey="age"
+                  tick={{ fontSize: 10, fill: 'rgba(255,255,255,0.4)' }}
+                  interval={9}
+                  axisLine={{ stroke: 'rgba(255,255,255,0.1)' }}
+                  tickLine={false}
+                  label={{
+                    value: '年龄',
+                    position: 'insideBottomRight',
+                    offset: -5,
+                    fontSize: 10,
+                    fill: 'rgba(255,255,255,0.3)',
+                  }}
+                />
+
+                <YAxis
+                  domain={[0, 100]}
+                  tick={{ fontSize: 10, fill: 'rgba(255,255,255,0.4)' }}
+                  axisLine={false}
+                  tickLine={false}
+                  ticks={[0, 25, 50, 75, 100]}
+                  label={{
+                    value: '运势分',
+                    angle: -90,
+                    position: 'insideLeft',
+                    fontSize: 10,
+                    fill: 'rgba(255,255,255,0.3)',
+                  }}
+                />
+
+                <Tooltip
+                  content={<CustomTooltip />}
+                  cursor={{ stroke: 'rgba(124,58,237,0.3)', strokeWidth: 1, strokeDasharray: '4 4' }}
+                />
+
+                {/* 大运分界线 */}
+                {daYunChanges.map((point, index) => (
+                  <ReferenceLine
+                    key={`dayun-${index}`}
+                    x={point.age}
+                    stroke="rgba(124,58,237,0.3)"
+                    strokeDasharray="3 3"
+                    strokeWidth={1}
+                  >
+                    <Label
+                      value={point.daYun}
+                      position="top"
+                      fill="#a78bfa"
+                      fontSize={9}
+                      fontWeight="bold"
+                    />
+                  </ReferenceLine>
+                ))}
+
+                {/* K 线蜡烛 */}
+                <Bar
+                  dataKey="bodyRange"
+                  shape={<CandleShape />}
+                  isAnimationActive={true}
+                  animationDuration={1500}
+                >
+                  <LabelList
+                    dataKey="high"
+                    position="top"
+                    content={<PeakLabel maxHigh={maxHigh} />}
+                  />
+                </Bar>
+              </ComposedChart>
+            </ResponsiveContainer>
+
+            {/* 生成状态 */}
+            {klineCache.isGenerating && (
+              <div className="absolute bottom-4 right-4 flex items-center gap-2 text-xs text-text-muted bg-night/80 px-3 py-1.5 rounded-lg">
+                <span className="inline-block w-3 h-3 border-2 border-star border-t-transparent rounded-full animate-spin" />
+                AI 正在生成运势解读...
+              </div>
+            )}
           </div>
 
-          {/* 选中时期详情 */}
-          {selectedPeriod && (
+          {/* ─── 选中年份详情 ─── */}
+          {selectedPoint && (
             <div className="grid md:grid-cols-2 gap-6">
               {/* 雷达图 */}
-              <ScoreRadar score={selectedPeriod.score} period={selectedPeriod.period} />
+              <ScoreRadar
+                score={{
+                  total: selectedPoint.score,
+                  trend: selectedPoint.close >= selectedPoint.open ? 'up' : 'down',
+                  dimensions: selectedPoint.dimensions,
+                }}
+                period={`${selectedPoint.year}年 (${selectedPoint.age}岁)`}
+              />
 
-              {/* 事件卡片 */}
-              <div className="space-y-3">
-                <h3 className="text-sm text-text-muted font-medium">
-                  📌 关键事件
+              {/* 详细信息卡片 */}
+              <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/[0.06] backdrop-blur-sm">
+                <h3 className="text-sm text-text-muted font-medium mb-4">
+                  📌 {selectedPoint.year}年 {selectedPoint.ganZhi} · {selectedPoint.age}岁
                 </h3>
-                {selectedPeriod.events.length > 0 ? (
-                  selectedPeriod.events.map((event, idx) => (
-                    <EventCard
-                      key={idx}
-                      event={event}
-                      description={klineEvents[`${selectedPeriod.period}-${event.title}`]}
-                      onRequestDescription={() => generateEventDescription(event, selectedPeriod.period)}
-                    />
-                  ))
-                ) : (
-                  <div className="text-text-muted text-sm p-4 text-center bg-white/[0.02] rounded-xl">
-                    此时期无特殊事件标注
+
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-text-muted">所属大运</span>
+                    <span className="text-star-light font-medium">{selectedPoint.daYun} ({selectedPoint.daYunRange})</span>
                   </div>
-                )}
+
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-text-muted">综合评分</span>
+                    <span className={`font-bold ${
+                      selectedPoint.score >= 70 ? 'text-gold' :
+                      selectedPoint.score >= 50 ? 'text-green-400' :
+                      selectedPoint.score >= 30 ? 'text-amber-400' : 'text-rose-400'
+                    }`}>
+                      {selectedPoint.score} 分
+                    </span>
+                  </div>
+
+                  {selectedPoint.yearlyMutagens && selectedPoint.yearlyMutagens.length > 0 && (
+                    <div className="pt-3 border-t border-white/10">
+                      <span className="text-text-muted text-sm block mb-2">流年四化</span>
+                      <div className="flex flex-wrap gap-1.5">
+                        {selectedPoint.yearlyMutagens.map((m, i) => (
+                          <span key={i} className="px-2 py-0.5 rounded text-xs bg-star/20 text-star-light">
+                            {m}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {selectedPoint.reason && (
+                    <div className="pt-3 border-t border-white/10">
+                      <span className="text-text-muted text-sm block mb-2">运势解读</span>
+                      <p className="text-text-secondary text-sm leading-relaxed" style={{ fontFamily: 'var(--font-brush)' }}>
+                        {selectedPoint.reason}
+                      </p>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           )}
@@ -491,12 +536,7 @@ export function LifeKLine() {
 
 function EmptyState() {
   return (
-    <div
-      className="
-        text-center p-8 rounded-2xl
-        bg-white/[0.02] border border-white/[0.06]
-      "
-    >
+    <div className="text-center p-8 rounded-2xl bg-white/[0.02] border border-white/[0.06]">
       <div className="text-4xl mb-4 opacity-30">📈</div>
       <p className="text-text-muted mb-4">
         请先在「命盘解读」中输入您的生辰信息

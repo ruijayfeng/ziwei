@@ -5,11 +5,64 @@
 ## 当前状态
 
 ```
-[分享卡片重构] 2026-01-07
-命格金句卡设计 + html2canvas 兼容性修复（布局一致性待优化）
+[人生K线重构] 2026-01-07
+ECharts → Recharts，100年视图，大运标注，峰值星标，LLM批量生成reason
 ```
 
 ## 变更日志
+
+### 2026-01-07 人生K线重构 - Recharts 方案
+
+**设计目标**
+- 参考 lifekline 开源项目的 K 线绘制方式
+- 统一为 1-100 岁完整人生视图（移除大限/三年/月度切换）
+- 保持深色玻璃态视觉风格
+
+**技术变更**
+- 图表库：ECharts → Recharts (ComposedChart + Bar)
+- K 线实现：自定义 CandleShape 组件（影线 + 蜡烛体）
+- 大运标注：ReferenceLine + Label（紫色虚线 + 顶部干支）
+- 峰值标记：金色五角星 SVG 标记人生巅峰
+- Tooltip：深色玻璃态，显示年份/干支/大运/OHLC/四化/reason
+
+**数据结构 (LifetimeKLinePoint)**
+```typescript
+interface LifetimeKLinePoint {
+  age: number              // 1-100
+  year: number             // 公历年份
+  ganZhi: string           // 流年干支
+  daYun: string            // 大运干支（10年一变）
+  daYunRange: string       // 大运年龄范围
+  open/close/high/low: number
+  score: number
+  reason?: string          // LLM 生成
+  dimensions: { career, wealth, relationship, health }
+  yearlyMutagens?: string[]
+}
+```
+
+**LLM reason 生成**
+- 一次性调用 LLM 生成 100 条运势描述
+- 先显示 K 线图，后台异步生成 reason
+- 生成完成后更新缓存刷新 UI
+
+**大运周期模型 (核心算法)**
+```
+Y轴 = 运势评分 (固定 0-100)
+每年独立评分 = 大运基础分 + 流年修正 + 月度波动
+
+大运基础分 (20-90): 大限宫位星曜决定 10 年水位
+流年修正 (-25~+25): 流年四化 + 流年命宫
+月度波动: 12 个月各自评分，产生 OHLC
+
+效果：好大运整体在 60-95 区间，差大运在 15-50 区间
+```
+
+**修改文件**
+- `package.json`: 添加 recharts 依赖
+- `fortune-score.ts`: 大运周期模型、generateLifetimeKLines()、六十甲子表
+- `stores/index.ts`: 简化 KLineCache 类型
+- `LifeKLine.tsx`: Recharts 实现 + 固定 Y轴 0-100 + 运势等级显示
 
 ### 2026-01-07 分享卡片重构 - 命格金句卡
 
@@ -115,6 +168,7 @@ interface YearlyData {
 | P6 | ✅ | `7640f9a` | 人生 K 线 + LLM 上下文完整化 |
 | P7 | ✅ | `e48d665` | 三大 AI 功能界面统一 |
 | P8 | ✅ | `dc31508` | 分享卡片重构 - 命格金句卡 |
+| P9 | ✅ | - | 人生 K 线重构 - Recharts + 累积值模型 |
 
 ## 架构地图
 
@@ -130,7 +184,7 @@ zwds/
 │   │   │   ├── ui/           # Button/Input/Select
 │   │   │   ├── chart/        # ChartDisplay (Bento Grid)
 │   │   │   ├── fortune/      # YearlyFortune
-│   │   │   ├── kline/        # LifeKLine/EventCard/ScoreRadar
+│   │   │   ├── kline/        # LifeKLine (Recharts) + ScoreRadar (ECharts)
 │   │   │   ├── match/        # MatchAnalysis
 │   │   │   ├── share/        # ShareCard (命格金句卡)
 │   │   │   ├── BirthForm.tsx
@@ -139,12 +193,13 @@ zwds/
 │   │   ├── lib/
 │   │   │   ├── astro.ts      # iztro 排盘封装
 │   │   │   ├── llm.ts        # 多模型适配层
-│   │   │   └── fortune-score.ts # 运势评分引擎
+│   │   │   └── fortune-score.ts # 运势评分引擎 + generateLifetimeKLines
 │   │   ├── knowledge/         # 结构化知识库 + LLM 上下文
 │   │   ├── stores/           # Zustand 状态管理
 │   │   ├── App.tsx           # 主入口
 │   │   └── index.css         # 全局样式
-│   └── package.json
+│   └── package.json          # 依赖: recharts, echarts, iztro...
+├── lifekline/                  # 参考开源项目 (Git 子仓库)
 └── docs/plans/
 ```
 
