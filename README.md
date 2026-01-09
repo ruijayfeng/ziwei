@@ -1,6 +1,7 @@
-# 紫微斗数 App
+# 紫微知道
 
 开源的紫微斗数命盘工具，精准排盘 + AI 深度解读，支持自部署和多模型切换。
+<img width="1920" height="911" alt="image" src="https://github.com/user-attachments/assets/756c0de6-e31c-4166-913e-c2d0afd1cf15" />
 
 ## 功能特性
 
@@ -17,7 +18,7 @@
 - **样式**: Tailwind CSS + Glassmorphism
 - **图表**: Recharts (K线) + ECharts (雷达图)
 - **排盘**: [iztro](https://github.com/SylarLong/iztro)
-- **LLM**: 多模型适配 (Kimi / Gemini / Claude / DeepSeek)
+- **LLM**: 多模型适配 (Kimi / Gemini / Claude / DeepSeek / etc)
 
 ## 快速开始
 
@@ -82,13 +83,34 @@ app/
 
 ## 截图预览
 
-> 待补充
+1. 信息填写页面
+<img width="1920" height="911" alt="image" src="https://github.com/user-attachments/assets/7e7cce4f-11bd-4cbd-beee-7e6fc0c1280a" />
+
+2. 命盘展示
+<img width="1920" height="911" alt="image" src="https://github.com/user-attachments/assets/756c0de6-e31c-4166-913e-c2d0afd1cf15" />
+
+3. 解读展示
+<img width="1920" height="911" alt="image" src="https://github.com/user-attachments/assets/3f151263-587d-4fdc-8017-e9eabdf6b47f" />
+
+4. 年度运势
+<img width="1646" height="1990" alt="image" src="https://github.com/user-attachments/assets/a79ba231-2e8f-4b08-a510-7eb456e40cbc" />
+
+5. 人生 K 线
+<img width="1920" height="911" alt="image" src="https://github.com/user-attachments/assets/09b64812-d247-4189-912b-0abea6051881" />
+
+6. 双人合盘
+<img width="1920" height="911" alt="image" src="https://github.com/user-attachments/assets/88407e8a-7a7b-4be4-ba5d-20eaaddcd996" />
+
+7. 黑金箔卡
+<img width="1920" height="911" alt="image" src="https://github.com/user-attachments/assets/921faecb-a35f-4386-85bf-89abf03f69d9" />
+
+
 
 ## 开源协议
 
 MIT License
 
 ## 致谢
-
+- [ClaudeCode](https://www.aicodemirror.com/register?invitecode=R2A5HD) - ClaudeCode 镜像站 国内加速 注册即送额度
 - [iztro](https://github.com/SylarLong/iztro) - 紫微斗数排盘库
 - [lifekline](https://github.com/AICryptoHK/lifekline) - K线设计参考
