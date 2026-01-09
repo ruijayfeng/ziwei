@@ -19,7 +19,7 @@ type TabType = 'chart' | 'fortune' | 'kline' | 'match' | 'share'
 const TABS: Array<{ key: TabType; label: string; icon: string }> = [
   { key: 'chart', label: '命盘解读', icon: '☰' },
   { key: 'fortune', label: '年度运势', icon: '◎' },
-  { key: 'kline', label: '人生K线', icon: '📈' },
+  { key: 'kline', label: '人生K线', icon: '⊹' },
   { key: 'match', label: '双人合盘', icon: '⚭' },
   { key: 'share', label: '分享卡片', icon: '◈' },
 ]
