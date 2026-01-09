@@ -48,6 +48,22 @@ npm run build
 3. 设置 Root Directory 为 `app`
 4. 部署完成
 
+## 部署到 Cloudflare Pages
+
+[![Deploy to Cloudflare Pages](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/ruijayfeng/ziwei)
+
+或手动部署：
+
+1. Fork 本仓库
+2. 登录 [Cloudflare Dashboard](https://dash.cloudflare.com/) → Pages → Create a project
+3. 连接 GitHub 并选择仓库
+4. 配置构建设置：
+   - **Framework preset**: Vite
+   - **Root directory**: `app`
+   - **Build command**: `npm run build`
+   - **Build output directory**: `dist`
+5. 部署完成
+
 ## 配置说明
 
 在应用内点击设置图标，配置 LLM API：
