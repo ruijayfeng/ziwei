@@ -7,6 +7,7 @@ import { useRef, useState, useCallback } from 'react'
 import html2canvas from 'html2canvas'
 import { useChartStore, useContentCacheStore } from '@/stores'
 import { Button } from '@/components/ui'
+import type { FunctionalAstrolabe } from '@/lib/astro'
 
 /* ------------------------------------------------------------
    字体常量 (html2canvas 不支持 CSS 变量，需硬编码)
@@ -54,20 +55,20 @@ function extractQuote(content: string): string | null {
    获取命宫主星
    ------------------------------------------------------------ */
 
-function getLifePalaceStars(chart: any): string {
-  const lifePalace = chart?.palaces?.find((p: any) => p.name === '命宫')
+function getLifePalaceStars(chart: FunctionalAstrolabe): string {
+  const lifePalace = chart.palaces.find((p) => p.name === '命宫')
   if (!lifePalace?.majorStars?.length) return '未知'
-  return lifePalace.majorStars.map((s: any) => s.name.replace('星', '')).join('·')
+  return lifePalace.majorStars.map((s) => String(s.name).replace('星', '')).join('·')
 }
 
 /* ------------------------------------------------------------
    获取格局名称
    ------------------------------------------------------------ */
 
-function getPatternName(chart: any): string | null {
+function getPatternName(chart: FunctionalAstrolabe): string | null {
   // 简化版格局判断 - 可后续扩展
-  const lifePalace = chart?.palaces?.find((p: any) => p.name === '命宫')
-  const stars = lifePalace?.majorStars?.map((s: any) => s.name) || []
+  const lifePalace = chart.palaces.find((p) => p.name === '命宫')
+  const stars = lifePalace?.majorStars?.map((s) => String(s.name)) || []
 
   if (stars.includes('紫微') && stars.includes('天府')) return '紫府同宫格'
   if (stars.includes('紫微') && stars.includes('贪狼')) return '紫贪同宫格'

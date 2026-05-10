@@ -8,6 +8,7 @@ import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { useSettingsStore } from '@/stores'
 import { generateChart, type BirthInfo, type Gender } from '@/lib/astro'
+import { clampDayToMonth, getDayOptions, getMonthOptions, getYearOptions } from '@/lib/birth-date'
 import { extractKnowledge, buildPromptContext } from '@/knowledge'
 import { streamChat, type ChatMessage, type LLMConfig } from '@/lib/llm'
 import { Button, Select } from '@/components/ui'
@@ -16,19 +17,8 @@ import { Button, Select } from '@/components/ui'
    年份/月份/日期选项
    ------------------------------------------------------------ */
 
-const currentYear = new Date().getFullYear()
-const YEAR_OPTIONS = Array.from({ length: 100 }, (_, i) => ({
-  value: currentYear - i,
-  label: `${currentYear - i}年`,
-}))
-const MONTH_OPTIONS = Array.from({ length: 12 }, (_, i) => ({
-  value: i + 1,
-  label: `${i + 1}月`,
-}))
-const DAY_OPTIONS = Array.from({ length: 31 }, (_, i) => ({
-  value: i + 1,
-  label: `${i + 1}日`,
-}))
+const YEAR_OPTIONS = getYearOptions()
+const MONTH_OPTIONS = getMonthOptions()
 const HOUR_OPTIONS = [
   { value: 23, label: '子时 (23:00-00:59)' },
   { value: 2, label: '丑时 (01:00-02:59)' },
@@ -140,8 +130,13 @@ interface PersonInputProps {
 
 function PersonInput({ label, value, onChange }: PersonInputProps) {
   const update = (field: keyof BirthInfo, val: number | Gender) => {
-    onChange({ ...value, [field]: val })
+    const next = { ...value, [field]: val }
+    if (field === 'year' || field === 'month') {
+      next.day = clampDayToMonth(next.year, next.month, next.day)
+    }
+    onChange(next)
   }
+  const dayOptions = getDayOptions(value.year, value.month)
 
   return (
     <div
@@ -174,7 +169,7 @@ function PersonInput({ label, value, onChange }: PersonInputProps) {
           />
           <Select
             label="日"
-            options={DAY_OPTIONS}
+            options={dayOptions}
             value={value.day}
             onChange={(e) => update('day', Number(e.target.value))}
           />

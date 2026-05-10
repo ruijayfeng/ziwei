@@ -305,8 +305,8 @@ function parsePalaces(chart: FunctionalAstrolabe): PalaceData[] {
     }))
 
     // 杂曜
-    const adjectiveStars: string[] = ((palace as any).adjectiveStars || []).map(
-      (s: any) => s.name as string
+    const adjectiveStars: string[] = (palace.adjectiveStars || []).map(
+      (s) => String(s.name)
     )
 
     return {

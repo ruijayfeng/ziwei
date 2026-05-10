@@ -432,7 +432,7 @@ export function generateDecadalKLines(
         trend: 'flat',
         dimensions: calculateDecadalDimensions(palace),
       },
-      events: generateBasicEvents(palaceForEvents, { total: avgScore, trend: 'flat', dimensions: { career: 50, wealth: 50, relationship: 50, health: 50 } }),
+      events: generateBasicEvents(palaceForEvents),
     })
   }
 
@@ -852,8 +852,7 @@ function generateBasicEvents(
     name: string
     majorStars: Array<{ name: string; mutagen?: string[] }>
     minorStars: Array<{ name: string }>
-  },
-  _score: FortuneScore
+  }
 ): EventData[] {
   const events: EventData[] = []
 

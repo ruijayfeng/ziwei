@@ -5,25 +5,11 @@
 import { useState } from 'react'
 import { Button, Input, Select } from '@/components/ui'
 import { generateChart, getShichenOptions, type BirthInfo, type Gender } from '@/lib/astro'
+import { clampDayToMonth, getDayOptions, getMonthOptions, getYearOptions } from '@/lib/birth-date'
 import { useChartStore } from '@/stores'
 
-const currentYear = new Date().getFullYear()
-
-const YEAR_OPTIONS = Array.from({ length: 100 }, (_, i) => ({
-  value: currentYear - i,
-  label: `${currentYear - i}年`,
-}))
-
-const MONTH_OPTIONS = Array.from({ length: 12 }, (_, i) => ({
-  value: i + 1,
-  label: `${i + 1}月`,
-}))
-
-const DAY_OPTIONS = Array.from({ length: 31 }, (_, i) => ({
-  value: i + 1,
-  label: `${i + 1}日`,
-}))
-
+const YEAR_OPTIONS = getYearOptions()
+const MONTH_OPTIONS = getMonthOptions()
 const HOUR_OPTIONS = getShichenOptions()
 
 const GENDER_OPTIONS = [
@@ -41,12 +27,25 @@ export function BirthForm() {
   const [gender, setGender] = useState<Gender>('male')
   const [loading, setLoading] = useState(false)
 
+  const dayOptions = getDayOptions(year, month)
+
+  const handleYearChange = (nextYear: number) => {
+    setYear(nextYear)
+    setDay((currentDay) => clampDayToMonth(nextYear, month, currentDay))
+  }
+
+  const handleMonthChange = (nextMonth: number) => {
+    setMonth(nextMonth)
+    setDay((currentDay) => clampDayToMonth(year, nextMonth, currentDay))
+  }
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
 
     try {
-      const birthInfo: BirthInfo = { year, month, day, hour, gender }
+      const safeDay = clampDayToMonth(year, month, day)
+      const birthInfo: BirthInfo = { year, month, day: safeDay, hour, gender }
       const chart = generateChart(birthInfo)
 
       setBirthInfo(birthInfo)
@@ -113,15 +112,15 @@ export function BirthForm() {
             <Select
               options={YEAR_OPTIONS}
               value={year}
-              onChange={(e) => setYear(Number(e.target.value))}
+              onChange={(e) => handleYearChange(Number(e.target.value))}
             />
             <Select
               options={MONTH_OPTIONS}
               value={month}
-              onChange={(e) => setMonth(Number(e.target.value))}
+              onChange={(e) => handleMonthChange(Number(e.target.value))}
             />
             <Select
-              options={DAY_OPTIONS}
+              options={dayOptions}
               value={day}
               onChange={(e) => setDay(Number(e.target.value))}
             />
