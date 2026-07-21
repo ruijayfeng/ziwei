@@ -15,7 +15,7 @@
     "@vercel/analytics": "^2.0.1",
     "date-fns": "^4.1.0",
     "dexie": "^4.2.1",
-    "echarts": "^6.0.0",
+    "echarts": "^6.1.0",
     "echarts-for-react": "^3.0.5",
     "html2canvas": "^1.4.1",
     "iztro": "^2.5.8",
